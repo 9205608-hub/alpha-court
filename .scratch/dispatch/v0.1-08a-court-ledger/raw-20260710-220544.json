@@ -1,0 +1,1 @@
+{"type":"error","message":"Internal error: {\n  \"message\": \"response truncated by max_tokens\",\n  \"error_kind\": \"max_tokens_truncation\"\n}"}

@@ -1,0 +1,41 @@
+sweep start 2026-07-18 10:16:10 head=c987a5b9
+[95452:MainThread](2026-07-18 10:16:12,851) INFO - qlib.Initialization - [config.py:452] - default_conf: client.
+[95452:MainThread](2026-07-18 10:16:13,591) INFO - qlib.Initialization - [__init__.py:75] - qlib successfully initialized based on client settings.
+[95452:MainThread](2026-07-18 10:16:13,591) INFO - qlib.Initialization - [__init__.py:77] - data_path={'__DEFAULT_FREQ': PosixPath('[HOME]/.qlib/qlib_data/cn_data')}
+[sweep] strength=0.0 β=0.0000 n=40 n_won=0 A=nan B=0.000 sub=0.000
+[sweep] strength=0.5 β=0.0047 n=40 n_won=2 A=0.000 B=0.050 sub=0.000
+[sweep] strength=1.0 β=0.0067 n=40 n_won=10 A=0.000 B=0.250 sub=0.000
+[sweep] strength=1.5 β=0.0087 n=40 n_won=14 A=0.000 B=0.350 sub=0.000
+[sweep] strength=2.0 β=0.0107 n=40 n_won=22 A=0.136 B=0.550 sub=0.075
+[sweep] strength=2.3 β=0.0119 n=40 n_won=29 A=0.172 B=0.725 sub=0.125
+[sweep] strength=2.6 β=0.0130 n=40 n_won=35 A=0.343 B=0.875 sub=0.300
+[sweep] strength=2.9 β=0.0142 n=40 n_won=38 A=0.421 B=0.950 sub=0.400
+[sweep] strength=3.2 β=0.0154 n=40 n_won=38 A=0.500 B=0.950 sub=0.475
+[sweep] strength=3.6 β=0.0169 n=40 n_won=40 A=0.750 B=1.000 sub=0.750
+[sweep] strength=4.0 β=0.0185 n=40 n_won=40 A=0.875 B=1.000 sub=0.875
+[sweep] strength=4.5 β=0.0204 n=40 n_won=40 A=0.975 B=1.000 sub=0.975
+[sweep] strength=5.0 β=0.0224 n=40 n_won=40 A=1.000 B=1.000 sub=1.000
+[sweep] strength=6.0 β=0.0262 n=40 n_won=40 A=1.000 B=1.000 sub=1.000
+[95452:MainThread](2026-07-19 17:15:51,144) ERROR - qlib.workflow - [utils.py:41] - An exception has been raised[ValueError: 'yerr' must not contain negative values].
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "[HOME]/Desktop/alpha-court/.claude/worktrees/peaceful-austin-4f2ada/examples/power_calibration/__main__.py", line 90, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "[HOME]/Desktop/alpha-court/.claude/worktrees/peaceful-austin-4f2ada/examples/power_calibration/__main__.py", line 80, in main
+    result = run_power_sweep(cfg, calibration=calibration)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "[HOME]/Desktop/alpha-court/.claude/worktrees/peaceful-austin-4f2ada/examples/power_calibration/run.py", line 803, in run_power_sweep
+    render_figures(out_dir=out_dir, summaries=summaries, calibration=calibration)
+  File "[HOME]/Desktop/alpha-court/.claude/worktrees/peaceful-austin-4f2ada/examples/power_calibration/figure.py", line 44, in render_figures
+    ax_a.errorbar(
+  File "[HOME]/Desktop/alpha-court/.claude/worktrees/peaceful-austin-4f2ada/.venv-regen/lib/python3.12/site-packages/matplotlib/_api/deprecation.py", line 477, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "[HOME]/Desktop/alpha-court/.claude/worktrees/peaceful-austin-4f2ada/.venv-regen/lib/python3.12/site-packages/matplotlib/__init__.py", line 1528, in inner
+    return func(
+           ^^^^^
+  File "[HOME]/Desktop/alpha-court/.claude/worktrees/peaceful-austin-4f2ada/.venv-regen/lib/python3.12/site-packages/matplotlib/axes/_axes.py", line 4232, in errorbar
+    raise ValueError(
+ValueError: 'yerr' must not contain negative values
+=== SWEEP EXIT=1 at 2026-07-19 17:15:51 ===

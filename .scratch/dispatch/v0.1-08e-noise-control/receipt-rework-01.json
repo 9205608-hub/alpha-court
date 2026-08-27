@@ -1,0 +1,50 @@
+{
+  "ticket_id": "v0.1-08e",
+  "status": "done",
+  "summary": "Updated the Raises section of empirical_null_p in court/noise.py so ValueError covers only in-contract guards (empty / non-1-D / non-finite nulls, non-finite observed, alpha outside (0,1)) and documents that TypeError may propagate for entirely wrong argument types (e.g. generator nulls, observed=None). Behavior unchanged; tests untouched.",
+  "branch": "dispatch/v01-08e-noise-20260710-220610",
+  "commit": "7840183d1591bebb90c623d6c6149c934f26a7ee",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v01-08e-noise-20260710-220610",
+  "files_changed": [
+    {
+      "path": "court/noise.py",
+      "action": "modified",
+      "purpose": "Clarify Raises docstring: ValueError for contracted guards; TypeError may propagate for wrong types"
+    }
+  ],
+  "self_test": [
+    {
+      "cmd": ".venv/bin/python -m pytest tests/test_noise.py -v",
+      "exit_code": 0,
+      "output_tail": "============================== 11 passed in 0.08s =============================="
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest",
+      "exit_code": 0,
+      "output_tail": "============================== 13 passed in 0.08s =============================="
+    },
+    {
+      "cmd": ".venv/bin/ruff check .",
+      "exit_code": 0,
+      "output_tail": "All checks passed!"
+    },
+    {
+      "cmd": ".venv/bin/python -c \"from court.noise import empirical_null_p; r = empirical_null_p(2.0, [1.9, 2.0, 0.5]); assert r.p_hat == 0.5 and r.decision == 'reject' and r.n_at_least == 1, r\"",
+      "exit_code": 0,
+      "output_tail": "smoke_ok"
+    },
+    {
+      "cmd": "git show --stat HEAD",
+      "exit_code": 0,
+      "output_tail": " court/noise.py | 9 +++++++--\n 1 file changed, 7 insertions(+), 2 deletions(-)"
+    },
+    {
+      "cmd": "git status --porcelain",
+      "exit_code": 0,
+      "output_tail": ""
+    }
+  ],
+  "deviations": [],
+  "open_questions": [],
+  "notes_for_referee": "Docstring-only change addressing MINOR #1; no runtime or test changes."
+}

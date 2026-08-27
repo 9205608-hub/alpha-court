@@ -1,0 +1,97 @@
+{
+  "ticket_id": "v0.2-08",
+  "status": "done",
+  "summary": "Added optional VerdictRecord.role (discriminating|informational|None) with append_verdict validation and legacy replay. Judge enforces direction-homogeneous scopes, stamps per-gate roles per Q2/Q3, resolves PBO metrics to abs_sharpe/sharpe/neg_sharpe with the resolved name recorded in params, and runs DSR on negated series under less. Killer-demo aggregation counts only non-informational verdicts; report battery table gains a Role column and updated two-sided footnotes. Exported DeclarationRecord and SealRecord. New tests/test_judge_direction.py covers idle-gate, three-branch, mixed-direction, metric form guard, and ledger role round-trip.",
+  "branch": "dispatch/v02-08-selection-verdict-20260713-104920",
+  "commit": "722c63ab5db61de60656901a1b8e720f8a3250b3",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v02-08-selection-verdict-20260713-104920",
+  "files_changed": [
+    {
+      "path": "court/__init__.py",
+      "action": "modified",
+      "purpose": "Re-export DeclarationRecord and SealRecord"
+    },
+    {
+      "path": "court/judge.py",
+      "action": "modified",
+      "purpose": "Direction-homogeneous scope guard, gate role stamping, abs/neg sharpe registry, direction-aware DSR/PBO"
+    },
+    {
+      "path": "court/ledger.py",
+      "action": "modified",
+      "purpose": "Optional VerdictRecord.role field, append_verdict validation/storage, replay"
+    },
+    {
+      "path": "examples/killer_demo/aggregate.py",
+      "action": "modified",
+      "purpose": "Discriminating-only survival and gates_faced_passed"
+    },
+    {
+      "path": "examples/killer_demo/battery.py",
+      "action": "modified",
+      "purpose": "Docstring notes judge-side metric resolution and DSR informational role"
+    },
+    {
+      "path": "examples/killer_demo/report.py",
+      "action": "modified",
+      "purpose": "Battery Role column, DSR abstain note, abs_sharpe metric line, §6 footnote wording"
+    },
+    {
+      "path": "tests/test_judge.py",
+      "action": "modified",
+      "purpose": "Authorized fixture direction=greater for signed PBO oracle"
+    },
+    {
+      "path": "tests/test_judge_direction.py",
+      "action": "added",
+      "purpose": "Direction/role/idle-gate/ledger-role tests (15 new)"
+    },
+    {
+      "path": "tests/test_killer_demo.py",
+      "action": "modified",
+      "purpose": "Aggregation tests for informational and legacy role=None"
+    }
+  ],
+  "self_test": [
+    {
+      "cmd": "python3 -m venv .venv && .venv/bin/python -m pip install -e \".[dev,demo]\"",
+      "exit_code": 0,
+      "output_tail": "Successfully installed alpha-court-0.1.0.dev0 ... matplotlib-3.11.0 numpy-2.5.1 pandas-3.0.3 pytest-9.1.1 ruff-0.15.21 scipy-1.18.0"
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest tests/test_judge_direction.py -v --tb=line  (red phase, pre-implementation)",
+      "exit_code": 1,
+      "output_tail": "FAILED test_idle_gate_informational_dsr_cannot_kill_survival\nFAILED test_three_branch_two_sided_dsr_informational_pbo_abs\nFAILED test_aggregation_informational_reject_does_not_kill\n========================= 9 failed, 6 passed in 41.49s ========================="
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest tests/test_judge_direction.py::test_idle_gate_informational_dsr_cannot_kill_survival tests/test_judge_direction.py::test_three_branch_two_sided_dsr_informational_pbo_abs -q --tb=line  (red replay with pre-v0.2 judge)",
+      "exit_code": 1,
+      "output_tail": "FAILED ... test_idle_gate_informational_dsr_cannot_kill_survival - AssertionError: assert None == 'informational'\nFAILED ... test_three_branch_two_sided_dsr_informational_pbo_abs - AssertionError: assert None == 'informational'\n2 failed in 2.10s"
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest tests/test_judge.py tests/test_judge_direction.py -q --tb=line",
+      "exit_code": 0,
+      "output_tail": ".............................                                            [100%]\n29 passed in 2.85s"
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest --ignore=tests/test_killer_demo.py -q --tb=line",
+      "exit_code": 0,
+      "output_tail": "........................................................................ [ 95%]\n...........                                                              [100%]\n227 passed, 1 skipped in 14.67s"
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest tests/test_killer_demo.py -v --durations=20 --tb=short",
+      "exit_code": 0,
+      "output_tail": "tests/test_killer_demo.py::test_panel_reproducible_from_seed_path PASSED [100%]\n======================= 17 passed in 1838.72s (0:30:38) ========================"
+    },
+    {
+      "cmd": ".venv/bin/ruff check .",
+      "exit_code": 0,
+      "output_tail": "All checks passed!"
+    }
+  ],
+  "deviations": [
+    "tests/test_judge.py::_aligned_three_trials declared direction changed from two-sided to greater (pre-authorized) so test_pbo_cscv_pass_and_reject keeps its signed-sharpe oracle and assertions under the new abs_sharpe two-sided resolution."
+  ],
+  "open_questions": [],
+  "notes_for_referee": "BASE was 28a8c27e040d0d07f89e743b3ac43969501f044c. git diff BASE..HEAD touches only the nine owned files; examples/killer_demo/out/ is empty. Full suite = non-demo (227 passed, 1 skipped) + killer_demo (17 passed); combined E2E is slow (~30 min for demo alone) due to abs_sharpe PBO on S=16. 15 new tests in test_judge_direction.py including idle-gate and three-branch. court.__version__ not bumped."
+}

@@ -1,0 +1,60 @@
+{
+  "structuredOutput": {
+    "ticket_id": "v0.3-02",
+    "status": "done",
+    "summary": "Added MagnitudeVsTurnoverBlade in gates/magnitude_vs_turnover.py: net(c) = mean_gross − c·tau, flag iff E[net] ≤ 0 at spec c_ref, with a cost-grid table and signed break-even c* (None when tau == 0). Missing/invalid turnover or c_ref and empty series take the evaluable=False path (flagged=False, JSON-safe, no raise). Tests in tests/test_gates_magnitude.py cover the hand vector, grid, break-even, invalid inputs, constructor, CertifiedRun screen/record smoke, and determinism. gates/ still has no court/harness imports.",
+    "branch": "dispatch/v0.3-02-magnitude-turnover-20260813-170932",
+    "commit": "c141ee3d945bff3444d8483f4e7902a4cd6e0691",
+    "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v0.3-02-magnitude-turnover-20260813-170932",
+    "files_changed": [
+      {
+        "path": "gates/magnitude_vs_turnover.py",
+        "action": "added",
+        "purpose": "Pure economic-floor blade: net(c)=mean_gross−c·tau, flag at c_ref, no significance stats."
+      },
+      {
+        "path": "tests/test_gates_magnitude.py",
+        "action": "added",
+        "purpose": "Red-first unit and CertifiedRun integration tests for the magnitude_vs_turnover blade."
+      }
+    ],
+    "self_test": [
+      {
+        "cmd": "python3 -m pytest tests/test_gates_magnitude.py -v --tb=line",
+        "exit_code": 2,
+        "output_tail": "tests/test_gates_magnitude.py:20: in <module>\n    from gates.magnitude_vs_turnover import MagnitudeVsTurnoverBlade\nE   ModuleNotFoundError: No module named 'gates.magnitude_vs_turnover'\n=========================== short test summary info ============================\nERROR tests/test_gates_magnitude.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n============================== 1 error in 19.47s ==============================="
+      },
+      {
+        "cmd": "python3 -m pytest tests/test_gates_magnitude.py -v --tb=short",
+        "exit_code": 0,
+        "output_tail": "tests/test_gates_magnitude.py::test_constructor_non_increasing_raises PASSED [ 81%]\ntests/test_gates_magnitude.py::test_identical_report_on_repeat_call PASSED [ 87%]\ntests/test_gates_magnitude.py::test_screen_on_flag_leaves_trial_registered_with_flagged_report PASSED [ 93%]\ntests/test_gates_magnitude.py::test_default_on_flag_records_when_spec_silent PASSED [100%]\n\n============================== 16 passed in 4.62s =============================="
+      },
+      {
+        "cmd": "python3 -m pytest -q",
+        "exit_code": 1,
+        "output_tail": "E       AssertionError: PBO via judge took 5.609s (need < 5.0s)\nE       assert 5.609184458851814 < 5.0\n\ntests/test_sharpe_perf.py:177: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_dense_panel_under_3s\nFAILED tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_churn_panel_under_5s\nFAILED tests/test_sharpe_perf.py::test_pbo_via_judge_completes_under_five_seconds\n3 failed, 596 passed, 2 skipped in 417.90s (0:06:57)"
+      },
+      {
+        "cmd": "python3 -m pytest tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_dense_panel_under_3s tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_churn_panel_under_5s tests/test_sharpe_perf.py::test_pbo_via_judge_completes_under_five_seconds -v --tb=line",
+        "exit_code": 1,
+        "output_tail": "E   AssertionError: evaluate_shifted(199) took 3.351s (budget 3.0s)\n    assert 3.35121783381328 < 3.0\n[HOME]/.alpha-court/dispatch-worktrees/v0.3-02-magnitude-turnover-20260813-170932/tests/test_adapter_kernel_perf.py:269: AssertionError: evaluate_shifted(199) took 3.351s (budget 3.0s)\n=========================== short test summary info ============================\nFAILED tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_dense_panel_under_3s\n========================= 1 failed, 2 passed in 18.32s ========================="
+      },
+      {
+        "cmd": "python3 -m ruff check .",
+        "exit_code": 0,
+        "output_tail": "All checks passed!"
+      }
+    ],
+    "deviations": [
+      "python3 -m pytest -q exited 1 solely on the three documented wall-clock perf tests (test_adapter_kernel_perf.py ×2, test_sharpe_perf.py ×1). Isolated re-run: churn and PBO passed; dense panel still 3.351s vs 3.0s budget. Product tests (16/16) and ruff are clean; ownership vs BASE 180987930cc667183eab0b09311f57005bc6eb9d is the two allowed files."
+    ],
+    "open_questions": [
+      "Happy-path statistics include evaluable=True (ticket only mandated evaluable=False on the inevaluable path).",
+      "n_obs is a Python int; other numeric statistics are Python floats.",
+      "Negative c_ref is accepted (ticket listed negative tau as invalid, not negative c_ref)."
+    ],
+    "notes_for_referee": "BASE before first commit: 180987930cc667183eab0b09311f57005bc6eb9d. TDD red was collection ModuleNotFoundError (exit 2) before gates/magnitude_vs_turnover.py existed. Full-suite failures match the ticket's loaded-machine caveat; isolated re-run left only the dense-panel 3s budget failing."
+  },
+  "text": "先按 TDD 读技能和现有 harness/测试夹具，再写红测。接下来对照 harness 协议、现有测试夹具和设计草稿，确认 blade 的输入输出形状。先记下 BASE，再写测试并跑红相。红相被管道吞了退出码；先不加实现，再跑一次拿到真实非零退出码。红相已记下（pytest 退出码 2）。开始实现 blade。全量测试里失败的正是票面注明的 3 个性能用例。接着修 ruff，并单独重跑这三项。```json\n{\n  \"ticket_id\": \"v0.3-02\",\n  \"status\": \"done\",\n  \"summary\": \"Added MagnitudeVsTurnoverBlade in gates/magnitude_vs_turnover.py: net(c) = mean_gross − c·tau, flag iff E[net] ≤ 0 at spec c_ref, with a cost-grid table and signed break-even c* (None when tau == 0). Missing/invalid turnover or c_ref and empty series take the evaluable=False path (flagged=False, JSON-safe, no raise). Tests in tests/test_gates_magnitude.py cover the hand vector, grid, break-even, invalid inputs, constructor, CertifiedRun screen/record smoke, and determinism. gates/ still has no court/harness imports.\",\n  \"branch\": \"dispatch/v0.3-02-magnitude-turnover-20260813-170932\",\n  \"commit\": \"c141ee3d945bff3444d8483f4e7902a4cd6e0691\",\n  \"worktree_path\": \"[HOME]/.alpha-court/dispatch-worktrees/v0.3-02-magnitude-turnover-20260813-170932\",\n  \"files_changed\": [\n    {\n      \"path\": \"gates/magnitude_vs_turnover.py\",\n      \"action\": \"added\",\n      \"purpose\": \"Pure economic-floor blade: net(c)=mean_gross−c·tau, flag at c_ref, no significance stats.\"\n    },\n    {\n      \"path\": \"tests/test_gates_magnitude.py\",\n      \"action\": \"added\",\n      \"purpose\": \"Red-first unit and CertifiedRun integration tests for the magnitude_vs_turnover blade.\"\n    }\n  ],\n  \"self_test\": [\n    {\n      \"cmd\": \"python3 -m pytest tests/test_gates_magnitude.py -v --tb=line\",\n      \"exit_code\": 2,\n      \"output_tail\": \"tests/test_gates_magnitude.py:20: in <module>\\n    from gates.magnitude_vs_turnover import MagnitudeVsTurnoverBlade\\nE   ModuleNotFoundError: No module named 'gates.magnitude_vs_turnover'\\n=========================== short test summary info ============================\\nERROR tests/test_gates_magnitude.py\\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\\n============================== 1 error in 19.47s ===============================\"\n    },\n    {\n      \"cmd\": \"python3 -m pytest tests/test_gates_magnitude.py -v --tb=short\",\n      \"exit_code\": 0,\n      \"output_tail\": \"tests/test_gates_magnitude.py::test_constructor_non_increasing_raises PASSED [ 81%]\\ntests/test_gates_magnitude.py::test_identical_report_on_repeat_call PASSED [ 87%]\\ntests/test_gates_magnitude.py::test_screen_on_flag_leaves_trial_registered_with_flagged_report PASSED [ 93%]\\ntests/test_gates_magnitude.py::test_default_on_flag_records_when_spec_silent PASSED [100%]\\n\\n============================== 16 passed in 4.62s ==============================\"\n    },\n    {\n      \"cmd\": \"python3 -m pytest -q\",\n      \"exit_code\": 1,\n      \"output_tail\": \"E       AssertionError: PBO via judge took 5.609s (need < 5.0s)\\nE       assert 5.609184458851814 < 5.0\\n\\ntests/test_sharpe_perf.py:177: AssertionError\\n=========================== short test summary info ============================\\nFAILED tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_dense_panel_under_3s\\nFAILED tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_churn_panel_under_5s\\nFAILED tests/test_sharpe_perf.py::test_pbo_via_judge_completes_under_five_seconds\\n3 failed, 596 passed, 2 skipped in 417.90s (0:06:57)\"\n    },\n    {\n      \"cmd\": \"python3 -m pytest tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_dense_panel_under_3s tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_churn_panel_under_5s tests/test_sharpe_perf.py::test_pbo_via_judge_completes_under_five_seconds -v --tb=line\",\n      \"exit_code\": 1,\n      \"output_tail\": \"E   AssertionError: evaluate_shifted(199) took 3.351s (budget 3.0s)\\n    assert 3.35121783381328 < 3.0\\n[HOME]/.alpha-court/dispatch-worktrees/v0.3-02-magnitude-turnover-20260813-170932/tests/test_adapter_kernel_perf.py:269: AssertionError: evaluate_shifted(199) took 3.351s (budget 3.0s)\\n=========================== short test summary info ============================\\nFAILED tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_dense_panel_under_3s\\n========================= 1 failed, 2 passed in 18.32s =========================\"\n    },\n    {\n      \"cmd\": \"python3 -m ruff check .\",\n      \"exit_code\": 0,\n      \"output_tail\": \"All checks passed!\"\n    }\n  ],\n  \"deviations\": [\n    \"python3 -m pytest -q exited 1 solely on the three documented wall-clock perf tests (test_adapter_kernel_perf.py ×2, test_sharpe_perf.py ×1). Isolated re-run: churn and PBO passed; dense panel still 3.351s vs 3.0s budget. Product tests (16/16) and ruff are clean; ownership vs BASE 180987930cc667183eab0b09311f57005bc6eb9d is the two allowed files.\"\n  ],\n  \"open_questions\": [\n    \"Happy-path statistics include evaluable=True (ticket only mandated evaluable=False on the inevaluable path).\",\n    \"n_obs is a Python int; other numeric statistics are Python floats.\",\n    \"Negative c_ref is accepted (ticket listed negative tau as invalid, not negative c_ref).\"\n  ],\n  \"notes_for_referee\": \"BASE before first commit: 180987930cc667183eab0b09311f57005bc6eb9d. TDD red was collection ModuleNotFoundError (exit 2) before gates/magnitude_vs_turnover.py existed. Full-suite failures match the ticket's loaded-machine caveat; isolated re-run left only the dense-panel 3s budget failing.\"\n}\n```这些后台命令的结果已经写进交付回执，没有新的失败。\n\n红相 pytest 退出码 2（模块尚不存在）；实现后 16 个 blade 测试全部通过。全量套件只剩下票面注明的 3 个墙钟性能用例；单独重跑后 churn 和 PBO 过了，dense-panel 仍略超 3 秒预算。工作已提交在 `c141ee3d`。",
+  "sessionId": "8bfb068e-32e0-4543-936b-6fa52322762e"
+}

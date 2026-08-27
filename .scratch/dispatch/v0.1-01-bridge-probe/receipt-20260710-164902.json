@@ -1,0 +1,34 @@
+{
+  "ticket_id": "v0.1-01-probe",
+  "status": "done",
+  "summary": "Created scripts/BRIDGE-SELFTEST.md as the bridge end-to-end self-test marker, with real working directory and branch filled in from the worktree environment. Committed only that file with message v0.1-01-probe: bridge self-test. Acceptance checks (cat, clean git status, commit log) all exited 0.",
+  "branch": "dispatch/v01-01-probe-20260710-164902",
+  "commit": "6ea4f13160f64f78c0df76dcf9047fa85990312c",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v01-01-probe-20260710-164902",
+  "files_changed": [
+    {
+      "path": "scripts/BRIDGE-SELFTEST.md",
+      "action": "added",
+      "purpose": "Bridge E2E self-test marker with real pwd and branch"
+    }
+  ],
+  "self_test": [
+    {
+      "cmd": "cat scripts/BRIDGE-SELFTEST.md",
+      "exit_code": 0,
+      "output_tail": "# Bridge self-test\n\nThis file was created by a headless worker agent through the alpha-court\ncommander→worker bridge, as the end-to-end proof for ticket v0.1-01.\n\n- Working directory: [HOME]/.alpha-court/dispatch-worktrees/v01-01-probe-20260710-164902\n- Branch: dispatch/v01-01-probe-20260710-164902"
+    },
+    {
+      "cmd": "git status --porcelain",
+      "exit_code": 0,
+      "output_tail": ""
+    },
+    {
+      "cmd": "git log --oneline -1",
+      "exit_code": 0,
+      "output_tail": "6ea4f13 v0.1-01-probe: bridge self-test"
+    }
+  ],
+  "deviations": [],
+  "open_questions": []
+}

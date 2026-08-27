@@ -1,0 +1,118 @@
+{
+  "ticket_id": "v0.2-05",
+  "status": "done",
+  "summary": "Built examples/power_calibration harness: §4.1 van der Waerden oracle×AR(1) mix (killer_demo.generation only), §4.2 calibrate.py with PCHIP β* freeze, §5 sweep with noise-pool cache, directed-t jury, greater battery via court.judge, A/B/submission via harness.aggregation_policy, adaptive re-seed, §6–§7 report/figures/β_t matched-ICIR appendix. Reduced synthetic tests (23 pass, 1 skip) without qlib; full suite 495 pass.",
+  "branch": "dispatch/v02-05-power-harness-20260717-134408",
+  "commit": "6f42e59fe8e5350d48ae64eaaeb061e343a2d42d",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v02-05-power-harness-20260717-134408",
+  "files_changed": [
+    {
+      "path": "examples/power_calibration/__init__.py",
+      "action": "added",
+      "purpose": "Package marker and version"
+    },
+    {
+      "path": "examples/power_calibration/__main__.py",
+      "action": "added",
+      "purpose": "CLI entry for power sweep (python -m examples.power_calibration)"
+    },
+    {
+      "path": "examples/power_calibration/calibrate.py",
+      "action": "added",
+      "purpose": "§4.2 β→ICIR calibration entry and freeze β* into run_config"
+    },
+    {
+      "path": "examples/power_calibration/config.py",
+      "action": "added",
+      "purpose": "Frozen grid/seeds/decision lines and PowerConfig"
+    },
+    {
+      "path": "examples/power_calibration/signal.py",
+      "action": "added",
+      "purpose": "§4.1 oracle+noise mix; reuse killer_demo.generation AR(1)"
+    },
+    {
+      "path": "examples/power_calibration/jury.py",
+      "action": "added",
+      "purpose": "Fresh directed-t offset jury (not abs_t killer_demo.grid)"
+    },
+    {
+      "path": "examples/power_calibration/battery.py",
+      "action": "added",
+      "purpose": "Greater-direction Application list for court.judge"
+    },
+    {
+      "path": "examples/power_calibration/run.py",
+      "action": "added",
+      "purpose": "§5 sweep: cache noise, A/B/submission, adaptive re-seed"
+    },
+    {
+      "path": "examples/power_calibration/report.py",
+      "action": "added",
+      "purpose": "report.md with first-screen honesty, size beside power"
+    },
+    {
+      "path": "examples/power_calibration/figure.py",
+      "action": "added",
+      "purpose": "Hero A/B, per-gate, calibration plots (matplotlib guarded)"
+    },
+    {
+      "path": "examples/power_calibration/stats_util.py",
+      "action": "added",
+      "purpose": "Wilson CI, annualized ICIR, PCHIP β* solve"
+    },
+    {
+      "path": "examples/power_calibration/beta_t.py",
+      "action": "added",
+      "purpose": "§7 half-window matched-ICIR / same-nominal β_t arms"
+    },
+    {
+      "path": "tests/test_power_calibration.py",
+      "action": "added",
+      "purpose": "≥12 reduced-config tests: e2e, determinism, won/direction invariants"
+    },
+    {
+      "path": "pyproject.toml",
+      "action": "modified",
+      "purpose": "Register examples.power_calibration for setuptools install"
+    }
+  ],
+  "self_test": [
+    {
+      "cmd": "python3 -m venv .venv && .venv/bin/python -m pip install -e \".[dev,demo]\"",
+      "exit_code": 0,
+      "output_tail": "install ok"
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest tests/test_power_calibration.py::test_mix_factor_beta_zero_equals_noise -v --tb=line  # RED: mix_factor deliberately broken",
+      "exit_code": 1,
+      "output_tail": "FAILED tests/test_power_calibration.py::test_mix_factor_beta_zero_equals_noise - AssertionError:\n============================== 1 failed in 1.20s ==============================="
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest tests/test_power_calibration.py -v",
+      "exit_code": 0,
+      "output_tail": "======================== 23 passed, 1 skipped in 6.15s ========================="
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest -q --tb=line",
+      "exit_code": 0,
+      "output_tail": "495 passed, 2 skipped in 683.27s (0:11:23)"
+    },
+    {
+      "cmd": ".venv/bin/ruff check .",
+      "exit_code": 0,
+      "output_tail": "All checks passed!"
+    }
+  ],
+  "deviations": [
+    "pyproject.toml was modified to list examples.power_calibration (required for editable install / -m entry); AC-5 said only examples/power_calibration/ and tests/test_power_calibration.py.",
+    "POWER_SEED_ROOT=420260711 is worker-chosen (outside killer-demo reserve and ≠ calibration 320260711); the book pins only the calibration root.",
+    "β_t appendix records matched-ICIR factor construction and realized ICIR arms; full greater-battery per-gate TPR on episodic arms is not re-run in the reduced path (structure + ICIR match only; referee real job can extend).",
+    "TDD red evidence was a deliberate temporary break of mix_factor after the first green suite, then restore — pure red-first order was not strictly chronological for every module."
+  ],
+  "open_questions": [
+    "Confirm POWER_SEED_ROOT=420260711 is acceptable for the frozen pre-registration book, or pin a commander-chosen root before the multi-day run.",
+    "Whether the real-data β_t job should also re-judge episodic panels through the full greater battery for unanimous/PBO-TPR drop points (harness currently freezes construction + realized ICIR)."
+  ],
+  "notes_for_referee": "Real-data acceptance (do NOT run on worker machine for days):\n\n1) Prerequisites: install qlib extra + csi300 data pack under ~/.qlib/qlib_data/cn_data (or pass --data-dir). From repo root:\n   python3 -m venv .venv && .venv/bin/python -m pip install -e \".[dev,demo,qlib]\"\n   Ensure the chenditc investment_data pack for tag 2026-07-05 is present (killer_demo ensure_data_pack / --skip-download after first download).\n\n2) Calibrate (freeze β* first) — expected runtime: minutes on real data:\n   .venv/bin/python -m examples.power_calibration.calibrate --out examples/power_calibration/out\n\n3) Full power sweep — expected runtime: ~1.5–2 days serial at R0=40; worst case ~4.2 days at R=120 adaptive cap:\n   .venv/bin/python -m examples.power_calibration --out examples/power_calibration/out --calibration examples/power_calibration/out/calibration.json\n\nArtifacts: run_config.json (frozen seeds/β*/φ), results.json, report.md, figure.png/svg, beta_t_appendix.json, per-seed ledgers under out/ledgers/. Do not write realized ICIR back onto the strength axis. Power is uncertified (direct court)."
+}

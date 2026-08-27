@@ -1,0 +1,47 @@
+{
+  "text": "{ \"ticket_id\": \"v0.1-04\", \"status\": \"partial\", \"summary\": \"Applying six minor referee precision fixes to docs/research/dsr.md only.\", \"branch\": \"\", \"commit\": \"\", \"worktree_path\": \"\", \"files_changed\": [], \"self_test\": [], \"deviations\": [], \"open_questions\": [] }{ \"ticket_id\": \"v0.1-04\", \"status\": \"partial\", \"summary\": \"Editing docs/research/dsr.md for the six referee precision items.\", \"branch\": \"\", \"commit\": \"\", \"worktree_path\": \"\", \"files_changed\": [], \"self_test\": [], \"deviations\": [], \"open_questions\": [] }{\n  \"ticket_id\": \"v0.1-04\",\n  \"status\": \"done\",\n  \"summary\": \"Updated docs/research/dsr.md for six minor referee items: stated Eq. (8) expanded Mertens form and its algebraic collapse to the §2.5/Eq. (11) denominator; marked 2014 Eq. (1)/(2) expected-max as ≈ under N ≫ 1 with App. A.2 Monte Carlo caveat; declared SR̂₀ (2014) renamed as SR̂* in this note; restated App. A.3 ill-conditioning as T < ½M(M−1); rephrased §3 runtime-source cells as math/prose; gave the PSR standard-error rewrite its own Eq. (11)/§2.5 citation.\",\n  \"branch\": \"dispatch/v01-04-dsr-20260710-171728\",\n  \"commit\": \"11e53cc82aaa8243cf974107ffb5bb094602415e\",\n  \"worktree_path\": \"[HOME]/.alpha-court/dispatch-worktrees/v01-04-dsr-20260710-171728\",\n  \"files_changed\": [\n    {\n      \"path\": \"docs/research/dsr.md\",\n      \"action\": \"modified\",\n      \"purpose\": \"Six minor precision fixes from referee findings (variance-form collapse, EVT ≈, SR̂₀ alias, T ill-conditioning, no-code mapping prose, SE-form citation)\"\n    }\n  ],\n  \"self_test\": [\n    {\n      \"cmd\": \"python3 content-checks for six referee items on docs/research/dsr.md\",\n      \"exit_code\": 0,\n      \"output_tail\": \"OK: 1 expanded Eq8\\nOK: 1 collapse stated\\nOK: 1 both citations collapse\\nOK: 2 approx symbol\\nOK: 2 App A.2 MC\\nOK: 3 SR0 rename\\nOK: 4 T condition\\nOK: 4 paper condition text\\nOK: 5 no norm.cdf in tables\\nOK: 6 SE form citation\"\n    },\n    {\n      \"cmd\": \"git add docs/research/dsr.md && git commit -m \\\"v0.1-04: address referee findings\\\"\",\n      \"exit_code\": 0,\n      \"output_tail\": \"[dispatch/v01-04-dsr-20260710-171728 11e53cc] v0.1-04: address referee findings\\n 1 file changed, 85 insertions(+), 49 deletions(-)\"\n    },\n    {\n      \"cmd\": \"git status --porcelain\",\n      \"exit_code\": 0,\n      \"output_tail\": \"\"\n    },\n    {\n      \"cmd\": \"git log --oneline -1\",\n      \"exit_code\": 0,\n      \"output_tail\": \"11e53cc v0.1-04: address referee findings\"\n    }\n  ],\n  \"deviations\": [],\n  \"open_questions\": [],\n  \"notes_for_referee\": \"All six listed minors addressed in docs/research/dsr.md only. Numeric test vectors unchanged. Look first at §2.a (Eq. 8 expanded + collapse), §2.c (≈ / N≫1 / SR̂₀ rename), §2.b SE rewrite citation, §3 tables (math/prose), §5.3 (T < ½M(M−1)).\"\n}",
+  "stopReason": "EndTurn",
+  "sessionId": "019f4b51-670c-79f0-8fe0-dc7ff75d7ce0",
+  "requestId": "5dc89a51-0d27-4403-8921-0911edc7d14f",
+  "thought": "The user wants me to fix minor precision issues in docs/research/dsr.md based on referee findings. Let me read the current file and make the fixes carefully.Let me read the rest of the file to make all the necessary edits carefully.I'll make all six fixes carefully with search_replace operations.There's a small prose issue - I have \"where:\" after the approximation note which might read awkwardly. Let me check that section and also fix any remaining Python syntax in runtime sources. Also I sho...I'll fix the orphaned \"where:\" to \"Symbols in Eq. (1):\". The remaining `ppf`/`norm.ppf` in pitfalls section is fine as it's discussing numerical implementation pitfalls, not code-mapping tables - the ...All six fixes verified and committed. Final output is ONLY the JSON receipt.",
+  "structuredOutput": {
+    "ticket_id": "v0.1-04",
+    "status": "done",
+    "summary": "Updated docs/research/dsr.md for six minor referee items: stated Eq. (8) expanded Mertens form and its algebraic collapse to the §2.5/Eq. (11) denominator; marked 2014 Eq. (1)/(2) expected-max as ≈ under N ≫ 1 with App. A.2 Monte Carlo caveat; declared SR̂₀ (2014) renamed as SR̂* in this note; restated App. A.3 ill-conditioning as T < ½M(M−1); rephrased §3 runtime-source cells as math/prose; gave the PSR standard-error rewrite its own Eq. (11)/§2.5 citation.",
+    "branch": "dispatch/v01-04-dsr-20260710-171728",
+    "commit": "11e53cc82aaa8243cf974107ffb5bb094602415e",
+    "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v01-04-dsr-20260710-171728",
+    "files_changed": [
+      {
+        "path": "docs/research/dsr.md",
+        "action": "modified",
+        "purpose": "Six minor precision fixes from referee findings (variance-form collapse, EVT ≈, SR̂₀ alias, T ill-conditioning, no-code mapping prose, SE-form citation)"
+      }
+    ],
+    "self_test": [
+      {
+        "cmd": "python3 content-checks for six referee items on docs/research/dsr.md",
+        "exit_code": 0,
+        "output_tail": "OK: 1 expanded Eq8\nOK: 1 collapse stated\nOK: 1 both citations collapse\nOK: 2 approx symbol\nOK: 2 App A.2 MC\nOK: 3 SR0 rename\nOK: 4 T condition\nOK: 4 paper condition text\nOK: 5 no norm.cdf in tables\nOK: 6 SE form citation"
+      },
+      {
+        "cmd": "git add docs/research/dsr.md && git commit -m \"v0.1-04: address referee findings\"",
+        "exit_code": 0,
+        "output_tail": "[dispatch/v01-04-dsr-20260710-171728 11e53cc] v0.1-04: address referee findings\n 1 file changed, 85 insertions(+), 49 deletions(-)"
+      },
+      {
+        "cmd": "git status --porcelain",
+        "exit_code": 0,
+        "output_tail": ""
+      },
+      {
+        "cmd": "git log --oneline -1",
+        "exit_code": 0,
+        "output_tail": "11e53cc v0.1-04: address referee findings"
+      }
+    ],
+    "deviations": [],
+    "open_questions": [],
+    "notes_for_referee": "All six listed minors addressed in docs/research/dsr.md only. Numeric test vectors unchanged. Look first at §2.a (Eq. 8 expanded + collapse), §2.c (≈ / N≫1 / SR̂₀ rename), §2.b SE rewrite citation, §3 tables (math/prose), §5.3 (T < ½M(M−1))."
+  }
+}

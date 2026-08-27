@@ -1,0 +1,45 @@
+{
+  "ticket_id": "v0.1-10a",
+  "status": "done",
+  "summary": "Addressed referee findings: IC now re-ranks within the per-date joint mask (PIT\u2227score-finite\u2227label-finite) when any finite cell is excluded, matching calc_ic ric; dense no-exclusion path keeps precomputed ranks. meta.config records every constructor field (incl. provider_uri, min_cross_section, quantile). Added \u00a78 golden RankIC fingerprint (seed 20260705, tag 2026-07-05). Strict config types raise (no float\u2192int or str coercion). Empty offsets raise; \u03b4=0 comment cites \u00a77.3 erratum. Fixed load-label comment and unstack; evaluate docstring documents out-of-window score rows ignored. Oracle tests extended for NaN labels and PIT churn.",
+  "branch": "dispatch/v01-10a-adapter-20260711-001636",
+  "commit": "0101f121aa2450be9e8fc3e6eac9fe9168b48f61",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v01-10a-adapter-20260711-001636",
+  "files_changed": [
+    {
+      "path": "adapters/qlib_cn.py",
+      "action": "modified",
+      "purpose": "Joint-mask RankIC, meta.config, strict config, empty offsets, docstring/comment fixes"
+    },
+    {
+      "path": "tests/test_adapter_qlib_cn.py",
+      "action": "modified",
+      "purpose": "NaN/PIT oracle, meta.config assert, strict-type tests, golden fingerprint, empty offsets"
+    }
+  ],
+  "self_test": [
+    {
+      "cmd": ".venv/bin/python -m pytest -q",
+      "exit_code": 0,
+      "output_tail": "143 passed in 4.15s"
+    },
+    {
+      "cmd": ".venv/bin/ruff check .",
+      "exit_code": 0,
+      "output_tail": "All checks passed!"
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest tests/test_adapter_qlib_cn.py -q",
+      "exit_code": 0,
+      "output_tail": "14 passed in 3.12s"
+    },
+    {
+      "cmd": "git status --porcelain",
+      "exit_code": 0,
+      "output_tail": ""
+    }
+  ],
+  "deviations": [],
+  "open_questions": [],
+  "notes_for_referee": "Re-measured grid on real pack (T=483, N=336): init\u22481.704s; evaluate_shifted ic 1\u00d7199 \u224826.754s; returns 1\u00d7199 \u22481.125s. Correct joint re-rank is the cost; still seconds-to-minutes per candidate. Golden first5/last5/sha256 baked into test_golden_fingerprint_rankic_demo_window. adapters/__init__.py unchanged this round."
+}

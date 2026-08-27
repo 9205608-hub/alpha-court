@@ -1,0 +1,12 @@
+{
+  "ticket_id": "v0.1-11a",
+  "status": "partial",
+  "summary": "killer_demo tests green (15); running full suite then launching E2E demo detached.",
+  "branch": "dispatch/v01-11a-demo-20260711-010211",
+  "commit": "",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v01-11a-demo-20260711-010211",
+  "files_changed": [],
+  "self_test": [],
+  "deviations": [],
+  "open_questions": []
+}

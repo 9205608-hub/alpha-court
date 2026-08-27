@@ -1,0 +1,117 @@
+{
+  "arms": [
+    {
+      "arm": "constant",
+      "beta_used": 0.01849869674568192,
+      "n_seeds": 40,
+      "n_won": 40,
+      "note": "constant daily edge; greater-battery TPR",
+      "pbo_tpr": 0.875,
+      "realized_icir": 3.790029393431637,
+      "reference_icir": 4.0,
+      "unanimous_tpr": 0.8
+    },
+    {
+      "arm": "forward_off_matched",
+      "beta_used": 0.05,
+      "n_seeds": 40,
+      "n_won": 40,
+      "note": "primary: matched full-sample ICIR; greater-battery TPR",
+      "pbo_tpr": 1.0,
+      "realized_icir": 5.628407217119998,
+      "reference_icir": 4.0,
+      "unanimous_tpr": 1.0
+    },
+    {
+      "arm": "backward_off_matched",
+      "beta_used": 0.05,
+      "n_seeds": 40,
+      "n_won": 40,
+      "note": "primary: matched full-sample ICIR; greater-battery TPR",
+      "pbo_tpr": 1.0,
+      "realized_icir": 5.725741862406104,
+      "reference_icir": 4.0,
+      "unanimous_tpr": 1.0
+    },
+    {
+      "arm": "same_nominal_forward",
+      "beta_used": 0.01849869674568192,
+      "n_seeds": 40,
+      "n_won": 27,
+      "note": "secondary: same-nominal-\u03b2 (confounds strength with episodicity)",
+      "pbo_tpr": 0.25925925925925924,
+      "realized_icir": 1.9798807065444552,
+      "reference_icir": 4.0,
+      "unanimous_tpr": 0.1111111111111111
+    },
+    {
+      "arm": "constant",
+      "beta_used": 0.15,
+      "n_seeds": 40,
+      "n_won": 40,
+      "note": "constant daily edge; greater-battery TPR",
+      "pbo_tpr": 1.0,
+      "realized_icir": 39.01210093995128,
+      "reference_icir": 3.0,
+      "unanimous_tpr": 1.0
+    },
+    {
+      "arm": "forward_off_matched",
+      "beta_used": 0.05,
+      "n_seeds": 40,
+      "n_won": 40,
+      "note": "primary: matched full-sample ICIR; greater-battery TPR",
+      "pbo_tpr": 1.0,
+      "realized_icir": 5.688329394853128,
+      "reference_icir": 3.0,
+      "unanimous_tpr": 1.0
+    },
+    {
+      "arm": "backward_off_matched",
+      "beta_used": 0.05,
+      "n_seeds": 40,
+      "n_won": 40,
+      "note": "primary: matched full-sample ICIR; greater-battery TPR",
+      "pbo_tpr": 1.0,
+      "realized_icir": 5.725743237279613,
+      "reference_icir": 3.0,
+      "unanimous_tpr": 1.0
+    },
+    {
+      "arm": "same_nominal_forward",
+      "beta_used": 0.15,
+      "n_seeds": 40,
+      "n_won": 40,
+      "note": "secondary: same-nominal-\u03b2 (confounds strength with episodicity)",
+      "pbo_tpr": 1.0,
+      "realized_icir": 12.100922229404285,
+      "reference_icir": 3.0,
+      "unanimous_tpr": 1.0
+    }
+  ],
+  "battery_ran": true,
+  "drops": [
+    {
+      "note": "primary: constant vs mean(forward_off_matched, backward_off_matched)",
+      "pbo_drop": -0.125,
+      "pbo_tpr_constant": 0.875,
+      "pbo_tpr_matched": 1.0,
+      "reference_icir": 4.0,
+      "unanimous_drop": -0.19999999999999996,
+      "unanimous_tpr_constant": 0.8,
+      "unanimous_tpr_matched": 1.0
+    },
+    {
+      "note": "primary: constant vs mean(forward_off_matched, backward_off_matched)",
+      "pbo_drop": 0.0,
+      "pbo_tpr_constant": 1.0,
+      "pbo_tpr_matched": 1.0,
+      "reference_icir": 3.0,
+      "unanimous_drop": 0.0,
+      "unanimous_tpr_constant": 1.0,
+      "unanimous_tpr_matched": 1.0
+    }
+  ],
+  "n_seeds": 40,
+  "shell_phi": 0.97
+}

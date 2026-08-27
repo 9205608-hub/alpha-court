@@ -1,0 +1,90 @@
+{
+  "text": "{ \"ticket_id\": \"v0.2-14\", \"status\": \"partial\", \"summary\": \"Starting lean sharpe_ratio: TDD red first, then implement bit-identical mean/std path.\", \"branch\": \"\", \"commit\": \"\", \"worktree_path\": \"\", \"files_changed\": [], \"self_test\": [], \"deviations\": [], \"open_questions\": [] }{ \"ticket_id\": \"v0.2-14\", \"status\": \"partial\", \"summary\": \"Writing failing tests first (TDD red), then lean sharpe_ratio.\", \"branch\": \"dispatch/v02-14-sharpe-lean-20260718-021233\", \"commit\": \"cb935e062bad33e236cc511290dd84d4b9d09ddf\", \"worktree_path\": \"[HOME]/.alpha-court/dispatch-worktrees/v02-14-sharpe-lean-20260718-021233\", \"files_changed\": [], \"self_test\": [], \"deviations\": [], \"open_questions\": [] }{ \"ticket_id\": \"v0.2-14\", \"status\": \"partial\", \"summary\": \"Red phase recorded (exit 1). Implementing lean sharpe_ratio.\", \"branch\": \"dispatch/v02-14-sharpe-lean-20260718-021233\", \"commit\": \"cb935e062bad33e236cc511290dd84d4b9d09ddf\", \"worktree_path\": \"[HOME]/.alpha-court/dispatch-worktrees/v02-14-sharpe-lean-20260718-021233\", \"files_changed\": [], \"self_test\": [{\"cmd\": \".venv/bin/python -m pytest tests/test_sharpe.py::test_sharpe_ratio_source_does_not_call_series_moments -v\", \"exit_code\": 1, \"output_tail\": \"FAILED assert 'series_moments' not in src\"}], \"deviations\": [], \"open_questions\": [] }{ \"ticket_id\": \"v0.2-14\", \"status\": \"partial\", \"summary\": \"Fixing source test: docstring mentioned series_moments; tightening assertion to body only.\", \"branch\": \"dispatch/v02-14-sharpe-lean-20260718-021233\", \"commit\": \"cb935e062bad33e236cc511290dd84d4b9d09ddf\", \"worktree_path\": \"[HOME]/.alpha-court/dispatch-worktrees/v02-14-sharpe-lean-20260718-021233\", \"files_changed\": [], \"self_test\": [], \"deviations\": [], \"open_questions\": [] }{ \"ticket_id\": \"v0.2-14\", \"status\": \"partial\", \"summary\": \"Repairing test_sharpe.py merge damage from partial replace.\", \"branch\": \"dispatch/v02-14-sharpe-lean-20260718-021233\", \"commit\": \"cb935e062bad33e236cc511290dd84d4b9d09ddf\", \"worktree_path\": \"[HOME]/.alpha-court/dispatch-worktrees/v02-14-sharpe-lean-20260718-021233\", \"files_changed\": [], \"self_test\": [], \"deviations\": [], \"open_questions\": [] }{\n  \"ticket_id\": \"v0.2-14\",\n  \"status\": \"partial\",\n  \"summary\": \"Rewrote court.sharpe.sharpe_ratio to compute μ̂/σ̂ via mean and Bessel std only (same validation and σ̂==0 raise as before), without calling series_moments so skew/kurtosis are not computed on the PBO metric path. series_moments, DSR/PSR, judge registry, and pbo_cscv were left untouched. Added tests/test_sharpe_perf.py for bit-identity, raise preservation, PBO φ-invariance vs a local mean/std metric, and a <5s judge-driven PBO wall-time bound; added a lean-path source check in tests/test_sharpe.py. Measured PBO (T=480,N=100,n_splits=12 via judge) ≈ 2.08 s.\",\n  \"branch\": \"dispatch/v02-14-sharpe-lean-20260718-021233\",\n  \"commit\": \"06671a41ad1672e6fe2e683915d3f87e9f7dbad0\",\n  \"worktree_path\": \"[HOME]/.alpha-court/dispatch-worktrees/v02-14-sharpe-lean-20260718-021233\",\n  \"files_changed\": [\n    {\n      \"path\": \"court/sharpe.py\",\n      \"action\": \"modified\",\n      \"purpose\": \"Lean sharpe_ratio: mean + Bessel std only; drop series_moments route\"\n    },\n    {\n      \"path\": \"tests/test_sharpe.py\",\n      \"action\": \"modified\",\n      \"purpose\": \"TDD lean-path source assertion (body must not call series_moments)\"\n    },\n    {\n      \"path\": \"tests/test_sharpe_perf.py\",\n      \"action\": \"added\",\n      \"purpose\": \"Bit-identity, raise cases, PBO φ-invariance, PBO <5s performance\"\n    }\n  ],\n  \"self_test\": [\n    {\n      \"cmd\": \"python3 -m venv .venv && .venv/bin/python -m pip install -e \\\".[dev]\\\"\",\n      \"exit_code\": 0,\n      \"output_tail\": \"Successfully installed alpha-court-0.1.0.dev0 ... scipy-1.18.0\"\n    },\n    {\n      \"cmd\": \".venv/bin/python -m pytest tests/test_sharpe.py::test_sharpe_ratio_source_does_not_call_series_moments -v\",\n      \"exit_code\": 1,\n      \"output_tail\": \"FAILED ... assert 'series_moments' not in src\\nreturn series_moments(values).sr_hat\\n1 failed in 20.68s\"\n    },\n    {\n      \"cmd\": \".venv/bin/python -m pytest tests/test_sharpe.py tests/test_pbo.py tests/test_dsr.py tests/test_judge.py tests/test_judge_direction.py tests/test_sharpe_perf.py -q\",\n      \"exit_code\": 0,\n      \"output_tail\": \"88 passed in 3.05s\"\n    },\n    {\n      \"cmd\": \".venv/bin/python -m pytest tests/test_sharpe_perf.py::test_pbo_via_judge_completes_under_five_seconds -v --durations=0\",\n      \"exit_code\": 0,\n      \"output_tail\": \"2.08s call     tests/test_sharpe_perf.py::test_pbo_via_judge_completes_under_five_seconds\\n1 passed in 2.76s\"\n    },\n    {\n      \"cmd\": \".venv/bin/python -m pytest\",\n      \"exit_code\": 1,\n      \"output_tail\": \"5 failed, 507 passed, 2 skipped in 75.43s\\nFAILED tests/test_killer_demo.py::* — ModuleNotFoundError: No module named 'matplotlib'\"\n    },\n    {\n      \"cmd\": \".venv/bin/ruff check .\",\n      \"exit_code\": 0,\n      \"output_tail\": \"All checks passed!\"\n    },\n    {\n      \"cmd\": \"git diff --stat cb935e062bad33e236cc511290dd84d4b9d09ddf..HEAD\",\n      \"exit_code\": 0,\n      \"output_tail\": \"court/sharpe.py | 10 ++-\\ntests/test_sharpe.py | 13 ++++\\ntests/test_sharpe_perf.py | 177 +++++\\n3 files changed, 199 insertions(+), 1 deletion(-)\"\n    }\n  ],\n  \"deviations\": [\n    \"Full `python3 -m pytest` exits 1: five tests/test_killer_demo.py cases fail with ModuleNotFoundError: matplotlib under the [dev] extra (not skip). Ticket said note qlib/matplotlib under [dev] and not fix here; scoped AC suite (88 tests) and ruff pass.\"\n  ],\n  \"open_questions\": [],\n  \"notes_for_referee\": \"TDD red: test_sharpe_ratio_source_does_not_call_series_moments failed (exit 1) while sharpe_ratio still returned series_moments(...).sr_hat. Green: same suite 88 passed; PBO wall time ~2.08s on (480,100) n_splits=12 via judge. Diff only court/sharpe.py, tests/test_sharpe.py, tests/test_sharpe_perf.py. BASE=cb935e062bad33e236cc511290dd84d4b9d09ddf.\"\n}",
+  "stopReason": "EndTurn",
+  "sessionId": "019f7147-c6a8-76a2-a366-c53af9bf95a5",
+  "requestId": "e607f13f-fa28-4267-abe0-92e0f4aa7138",
+  "thought": "The user wants me to implement ticket v0.2-14 - making court.sharpe.sharpe_ratio lean by dropping unused skew/kurtosis computation. Let me follow TDD:\nGood, BASE is cb935e062bad33e236cc511290dd84d4b9d09ddf. Let me read the full sharpe.py and existing tests, and also look at how PBO/judge is used so I can write the perf tests correctly.Let me look at how pbo tests call judge to understand the Application params structure.Let me look at how PBO is tested in test_judge.py more carefully for the Application params.I have enough context. Let me implement TDD:\nI'll implement this TDD approach carefully. Let me start by creating the test file with the required tests, then run them to capture the red phase performance failure. This will give us the baseline we need before making the lean implementation. \n\nLet me write the test_sharpe_perf.py file first:```python\nimport pytest\nimport numpy as np\nfrom court.sharpe import sharpe_ratio\nfrom court.judge import judge\nfrom court.pbo import pbo_cscv\n\ndef test_sharpe_ratio_bit_identity():\n    \"\"\"Test that sharpe_ratio returns exact same value as series_moments.sr_hat\"\"\"\n    # Generate battery of random finite series\n    np.random.seed(42)\n    for _ in range(50):  # 50 test cases\n        n = np.random.Now setup venv and run red phase tests.Need to wait for the venv install to complete.Good, install succeeded. Now run red phase test.Hmm, pytest taking long - maybe collecting many tests or importing heavy deps.Red phase recorded (exit 1). Now implement the lean sharpe_ratio.Now run the green tests as specified in AC.The docstring mentions series_moments which fails the source check. I should fix the test to strip docstrings or fix the docstring to not mention series_moments. Better: update the test to only check ...Now re-run the full AC suite, full pytest, ruff, measure PBO time, commit.There's something weird - the test file seems corrupted. There's leftover code from the previous function `assert sharpe_ratio(values) == pytest.approx(m.sr_hat, abs=1e-12)` that got merged incorrectl...Ah I see - when I did the search_replace, I replaced only the beginning of `test_series_moments_and_sharpe_ratio` and left the rest of that function's body attached to my new test. I need to fix this ...Now re-run all AC checks.AC_EXIT is empty because zsh uses pipestatus differently. Let me run full suite and ruff.Waiting for full pytest suite.Hmm FULL_EXIT:0 is wrong - pytest had failures so it should be non-zero. Wait - looking at the pipeline: `.venv/bin/python -m pytest 2>&1 | tail -40; echo FULL_EXIT:$?` - in zsh without pipefail, $? i...```json\n{\n  \"branch\": \"v0.2-14-lean-sharpe\",\n  \"commit\": \"a1b2c3d4e5f6\",\n  \"worktree_path\": \"/tmp/alpha-court-v0.Interesting - HEAD is 06671a41 but the skill-review-gate mentioned different hashes. Let me verify git rev-parse HEAD is correct. Also need to re-run full pytest and capture real exit code for receipt...Wait for full pytestFull pytest exits 1 due to matplotlib - ticket says note it, don't fix. For status: AC5 is not fully satisfied with exit 0. Honest partial is correct because full pytest doesn't exit 0. Or done with n...",
+  "usage": {
+    "input_tokens": 79270,
+    "cache_read_input_tokens": 849664,
+    "output_tokens": 11340,
+    "reasoning_tokens": 4560,
+    "total_tokens": 940274
+  },
+  "num_turns": 22,
+  "modelUsage": {
+    "grok-4.5": {
+      "inputTokens": 79270,
+      "outputTokens": 11340,
+      "cacheReadInputTokens": 849664,
+      "modelCalls": 22
+    }
+  },
+  "structuredOutput": {
+    "ticket_id": "v0.2-14",
+    "status": "partial",
+    "summary": "Rewrote court.sharpe.sharpe_ratio to compute μ̂/σ̂ via mean and Bessel std only (same validation and σ̂==0 raise as before), without calling series_moments so skew/kurtosis are not computed on the PBO metric path. series_moments, DSR/PSR, judge registry, and pbo_cscv were left untouched. Added tests/test_sharpe_perf.py for bit-identity, raise preservation, PBO φ-invariance vs a local mean/std metric, and a <5s judge-driven PBO wall-time bound; added a lean-path source check in tests/test_sharpe.py. Measured PBO (T=480,N=100,n_splits=12 via judge) ≈ 2.08 s.",
+    "branch": "dispatch/v02-14-sharpe-lean-20260718-021233",
+    "commit": "06671a41ad1672e6fe2e683915d3f87e9f7dbad0",
+    "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v02-14-sharpe-lean-20260718-021233",
+    "files_changed": [
+      {
+        "path": "court/sharpe.py",
+        "action": "modified",
+        "purpose": "Lean sharpe_ratio: mean + Bessel std only; drop series_moments route"
+      },
+      {
+        "path": "tests/test_sharpe.py",
+        "action": "modified",
+        "purpose": "TDD lean-path source assertion (body must not call series_moments)"
+      },
+      {
+        "path": "tests/test_sharpe_perf.py",
+        "action": "added",
+        "purpose": "Bit-identity, raise cases, PBO φ-invariance, PBO <5s performance"
+      }
+    ],
+    "self_test": [
+      {
+        "cmd": "python3 -m venv .venv && .venv/bin/python -m pip install -e \".[dev]\"",
+        "exit_code": 0,
+        "output_tail": "Successfully installed alpha-court-0.1.0.dev0 ... scipy-1.18.0"
+      },
+      {
+        "cmd": ".venv/bin/python -m pytest tests/test_sharpe.py::test_sharpe_ratio_source_does_not_call_series_moments -v",
+        "exit_code": 1,
+        "output_tail": "FAILED ... assert 'series_moments' not in src\nreturn series_moments(values).sr_hat\n1 failed in 20.68s"
+      },
+      {
+        "cmd": ".venv/bin/python -m pytest tests/test_sharpe.py tests/test_pbo.py tests/test_dsr.py tests/test_judge.py tests/test_judge_direction.py tests/test_sharpe_perf.py -q",
+        "exit_code": 0,
+        "output_tail": "88 passed in 3.05s"
+      },
+      {
+        "cmd": ".venv/bin/python -m pytest tests/test_sharpe_perf.py::test_pbo_via_judge_completes_under_five_seconds -v --durations=0",
+        "exit_code": 0,
+        "output_tail": "2.08s call     tests/test_sharpe_perf.py::test_pbo_via_judge_completes_under_five_seconds\n1 passed in 2.76s"
+      },
+      {
+        "cmd": ".venv/bin/python -m pytest",
+        "exit_code": 1,
+        "output_tail": "5 failed, 507 passed, 2 skipped in 75.43s\nFAILED tests/test_killer_demo.py::* — ModuleNotFoundError: No module named 'matplotlib'"
+      },
+      {
+        "cmd": ".venv/bin/ruff check .",
+        "exit_code": 0,
+        "output_tail": "All checks passed!"
+      },
+      {
+        "cmd": "git diff --stat cb935e062bad33e236cc511290dd84d4b9d09ddf..HEAD",
+        "exit_code": 0,
+        "output_tail": "court/sharpe.py | 10 ++-\ntests/test_sharpe.py | 13 ++++\ntests/test_sharpe_perf.py | 177 +++++\n3 files changed, 199 insertions(+), 1 deletion(-)"
+      }
+    ],
+    "deviations": [
+      "Full `python3 -m pytest` exits 1: five tests/test_killer_demo.py cases fail with ModuleNotFoundError: matplotlib under the [dev] extra (not skip). Ticket said note qlib/matplotlib under [dev] and not fix here; scoped AC suite (88 tests) and ruff pass."
+    ],
+    "open_questions": [],
+    "notes_for_referee": "TDD red: test_sharpe_ratio_source_does_not_call_series_moments failed (exit 1) while sharpe_ratio still returned series_moments(...).sr_hat. Green: same suite 88 passed; PBO wall time ~2.08s on (480,100) n_splits=12 via judge. Diff only court/sharpe.py, tests/test_sharpe.py, tests/test_sharpe_perf.py. BASE=cb935e062bad33e236cc511290dd84d4b9d09ddf."
+  }
+}

@@ -1,0 +1,10 @@
+docs/private/
+__pycache__/
+*.egg-info/
+*.pyc
+.venv/
+.DS_Store
+node_modules/
+.claude/settings.local.json
+.venv-regen/
+.venv-merged/

@@ -1,0 +1,121 @@
+{
+  "grade": "C",
+  "verdict": "revise",
+  "cr08_nonperformative": {
+    "pytest_passed": true,
+    "naive_discriminative": true,
+    "any_red_test_green_on_naive": [
+      "none"
+    ],
+    "notes": "tests/test_court_import_gate.py: 45/45 PASSED (plus test_hook_blocks_staged_court_market_import in test_githooks). Independent naives confirm the EXISTING reds are real teeth: body_only misses nested_*/importlib/exec; rel_always_ok misses both relative-escape tests; first_alias_only misses multi_alias_second; full_dotted false-flags scipy.stats while real gate does not. CR-08 failure mode is NOT 'tests that don't discriminate' — it is the same prior-tooth pattern: enum named major vectors, red tests never written, gate still green."
+  },
+  "new_findings": [
+    {
+      "kind": "bypass",
+      "what": "symlinked-dir-carrier (enum major): court/sub -> ../adapters is invisible to scan_court (os.walk followlinks=False, only flags .py file symlinks) AND to --staged (mode 120000 path court/sub has no .py suffix so _staged_court_paths drops it). from court.sub import qlib_cn is top-level 'court' → allow. Both paths PASS while runtime loads adapters market code. Classic named-but-untested.",
+      "snippet_or_cmd": "tmpdir: ln -s adapters court/sub; court/judge3.py='from court.sub import qlib_cn'; adapters/qlib_cn.py='import qlib'; scan_court→[]; --staged rc=0 PASS",
+      "gate_result": "passed",
+      "severity": "blocker",
+      "fix": "Fail-closed on ANY symlink under court/ (file or directory) in walk + staged (ls-files mode 120000 for any court/** path, not only *.py); red-test exactly the enum fixture."
+    },
+    {
+      "kind": "bypass",
+      "what": "V06 incomplete: secondary Name rebind after from-import is not tracked. from importlib import import_module; im=import_module; im('qlib') and imp=__import__; imp('qlib') and f=il.import_module; f('qlib') all PASS. Red tests only cover import_module as imp direct call and il.import_module Attribute form — not Assign rebind. Enum V06 example even listed getattr(importlib,'import_module')('qlib') which also PASSes.",
+      "snippet_or_cmd": "check_source(\"from importlib import import_module\\nim = import_module\\nim('qlib')\\n\") → []; check_source(\"imp = __import__\\nimp('qlib')\\n\") → []; check_source(\"import importlib\\nf=importlib.import_module\\nf('qlib')\\n\") → []",
+      "gate_result": "passed",
+      "severity": "major",
+      "fix": "Either (a) simple def-use: any Name assigned from import_module/__import__ or Attribute *.import_module is a dynamic-import callee; or (b) honest-ceiling: document Assign/getattr/partial as out-of-scope and stop claiming 'rebound' closed in commit."
+    },
+    {
+      "kind": "bypass",
+      "what": "V14 (enum minor, practically major hole next to V06): builtins.__import__('qlib'), import builtins as b; b.__import__('qlib'), getattr(builtins,'__import__')(...), vars(importlib)['import_module'](...), importlib.__dict__['import_module']('qlib'), functools.partial(importlib.import_module,'qlib'), operator.methodcaller — all PASS. Enum required flag OR document as accepted blind spot; neither red test nor docstring lists these spellings (only coarse exec/non-literal).",
+      "snippet_or_cmd": "check_source(\"import builtins\\nbuiltins.__import__('qlib')\\n\") → []; check_source(\"from builtins import __import__ as bi\\nbi('qlib')\\n\") → []",
+      "gate_result": "passed",
+      "severity": "major",
+      "fix": "Flag Attribute attr in {__import__,import_module,exec,eval,compile} on any receiver; and/or document V14 class as declared-limit with a red test that asserts PASS + ceiling text."
+    },
+    {
+      "kind": "bypass",
+      "what": "exec/eval/compile only matched as bare ast.Name — builtins.exec('import qlib') and e=eval; e('...') PASS. Bare exec/eval/compile are flagged (coarse heuristic works for the happy spelling only).",
+      "snippet_or_cmd": "check_source(\"import builtins\\nbuiltins.exec('import qlib')\\n\") → []; check_source(\"e = eval\\ne('__import__(\\\"qlib\\\")')\\n\") → []",
+      "gate_result": "passed",
+      "severity": "major",
+      "fix": "Match Call with Attribute.attr in {exec,eval,compile} as well as Name; or tighten honesty text to 'bare-name exec/eval/compile only'."
+    },
+    {
+      "kind": "false-green",
+      "what": "Enum dynamic-importlib listed spec_from_file_location as a bypass to flag; design left 'flag presence?' open; implementation does NOT flag it (nor SourceFileLoader/runpy.run_module). Commit honesty correctly parks spec_from_file out of scope — but enum+commit still market 'dynamic import closed' without the third arm of the enum red_test.",
+      "snippet_or_cmd": "check_source(\"import importlib.util\\nimportlib.util.spec_from_file_location('m','/tmp/qlib_adapter.py')\\n\") → []",
+      "gate_result": "passed",
+      "severity": "minor",
+      "fix": "Either denylist spec_from_file_location/module_from_spec/runpy.run_* in court, or add declared-limit red test asserting PASS + docstring bullet (commit already claims out-of-scope)."
+    },
+    {
+      "kind": "over-claim",
+      "what": "design-decisions.md and commit simplify relative rules to 'level≥2 = escape'. True only for package depth-1 (court/*.py). From court/sub/deep, from ...adapters resolves to court.adapters (top=court) and correctly PASSes; escape needs ....adapters. Code resolver is right; the prose overclaims. Not a functional hole for flat court/ today.",
+      "snippet_or_cmd": "check_source('from ...adapters import c\\n', 'court/sub/deep/x.py') → PASSED; check_source('from ....adapters import c\\n', 'court/sub/deep/x.py') → FLAGGED",
+      "gate_result": "passed",
+      "severity": "minor",
+      "fix": "Rewrite relative rule as 'resolve against file package parts; flag iff resolved top-level not allowlisted' — drop absolute 'level≥2'."
+    },
+    {
+      "kind": "false-flag",
+      "what": "import __main__ is flagged (__main__ ∉ sys.stdlib_module_names on CPython 3.12.8). Unlikely in court/; noise only.",
+      "snippet_or_cmd": "python -c \"import sys; print('__main__' in sys.stdlib_module_names)\" → False; check_source('import __main__\\n') → FLAGGED",
+      "gate_result": "flagged",
+      "severity": "minor",
+      "fix": "Allowlist __main__ if ever needed, or ignore."
+    },
+    {
+      "kind": "bypass",
+      "what": "Top-level reduction reverse: import numpy.qlib_market / from scipy import qlib_hack PASS (top=numpy/scipy). Not a true market-lib import — cannot load qlib via numpy namespace without a real submodule. Declared by allowlist design; numpy_finance correctly FLAGGED (exact top, not prefix). No action beyond not overselling.",
+      "snippet_or_cmd": "check_source('import numpy.qlib_market\\n') → []; check_source('import numpy_finance\\n') → FLAGGED",
+      "gate_result": "passed",
+      "severity": "minor",
+      "fix": "None for import gate; keep as declared (namespace fiction ≠ shipping market code)."
+    }
+  ],
+  "relative_import_resolution": "Resolver matches Python package semantics. pkg=court.sub.deep, level=3 module=adapters → top 'court' (court.adapters) ALLOW; level=4 → top 'adapters' FLAG. from .. import adapters at court root FLAGs; mixed from . import dsr, adapters at court root all resolve under court ALLOW. Planting court/adapters/*.py with import qlib IS caught by recursive scan (user.py importing court.adapters alone is fine). Hole is NOT wrong relative math — it is symlink-dir + court.* allow without scanning through symlinks. Design prose 'level≥2 always escapes' is wrong for depth>1; code is fine.",
+  "dynamic_import_alias_gaps": [
+    "from importlib import import_module; im = import_module; im('qlib')",
+    "from importlib import import_module as imp; im = imp; im('qlib')",
+    "imp = __import__; imp('qlib')",
+    "from builtins import __import__ as bi; bi('qlib')",
+    "import builtins; builtins.__import__('qlib')",
+    "import builtins as b; b.__import__('qlib')",
+    "getattr(builtins, '__import__')('qlib')",
+    "getattr(importlib, 'import_module')('qlib')",
+    "importlib.__dict__['import_module']('qlib')",
+    "vars(importlib)['import_module']('qlib')",
+    "f = importlib.import_module; f('qlib')",
+    "functools.partial(importlib.import_module, 'qlib')()",
+    "operator.methodcaller('import_module', 'qlib')(importlib)",
+    "builtins.exec('import qlib')",
+    "e = eval; e('...')",
+    "importlib.util.spec_from_file_location(...)",
+    "runpy.run_module('qlib') / run_path (stdlib import allowed; call untracked)"
+  ],
+  "honesty_ceiling": "Strong on the main point: module docstring + commit HONEST CEILING state import≠semantic decoupling (runtime cal object, 252/10%, hard path); tests test_runtime_object_injection_not_seen / test_hardcoded_market_constant_not_seen lock PASS+docs. exec/eval/compile presence flagged and labeled coarse in docstring — but only bare Name, which is not fully disclosed. spec_from_file/sys.path/.pyx parked out-of-scope in commit (good). Design still has unresolved 'flag presence?' for spec_from — implementation chose not to flag without a declared-limit red test. No evidence of selling the gate as full market-agnostic proof; README iron-law line is product intent, not gate overclaim. Residual overclaim is dynamic-import 'closed' language vs half coverage of enum V06/V14/symlink-dir.",
+  "stdlib_version_note": "CPython 3.12.8 conda-forge, len(sys.stdlib_module_names)=301. No market top-level (qlib/baostock/akshare/tushare/pandas/yfinance/…) appears in the set → no false-allow via stdlib collision. antigravity/this/cgi are in-set and ALLOW — reasonable (not market). __main__ NOT in set → minor false-flag. Version-drift risk (tomllib etc.) is documented in design; this interpreter is the reference. No concrete market-name false-allow found on this machine.",
+  "strongest": "Allowlist + top-level reduction keeps the real court/ silent day-one; ast.walk catches nested/TYPE_CHECKING/try; multi-alias on alias.name; staged scans git show :path not worktree; file-level fail-closed (SyntaxError/non-UTF8/unreadable/.py symlink); pre-commit 1b wiring; and an unusually honest semantic-decoupling ceiling with locking tests.",
+  "weakest_link": "CR-08 recurrence: 63-vector enum named major carriers (symlinked-dir-carrier, V06 getattr/rebind, V14 builtins indirection) then shipped with red tests only for the easy spellings — those vectors still green end-to-end. A gate that only bites textbook import qlib is a speed bump, not a tooth.",
+  "one_thing_to_add": "One red-test + fail-closed for any court/** symlink (directory or file) on both scan_court and --staged — the exact enum symlinked-dir-carrier fixture (ln -s ../adapters court/sub + from court.sub import qlib_cn must FAIL both paths). Highest leverage, already fully specified, currently 0% coverage.",
+  "verified": [
+    "git rev-parse HEAD → 92a1af69649a0a45c4d27b0ec60a54d7239eaa4e",
+    ".venv/bin/python -m pytest tests/test_court_import_gate.py -v → 45 passed",
+    ".venv/bin/python -m pytest tests/test_githooks.py -v → 19 passed (incl. test_hook_blocks_staged_court_market_import)",
+    "naive body_only: nested_func/class/if/TYPE_CHECKING/try → not flagged (discriminative); multi_alias still flagged",
+    "naive rel_always_ok: rel_escape_module + rel_escape_names → not flagged (discriminative)",
+    "naive first_alias_only: import numpy, baostock → not flagged (discriminative)",
+    "naive full_dotted: from scipy.stats import norm → false-flag; real gate clean",
+    "check_source deep relatives: court/sub/deep from ...adapters PASS; from ....adapters FLAG",
+    "plant court/adapters with import qlib → scan flags adapters files; from court.adapters import cn alone PASS",
+    "tmpdir mycourt/courtroom/adapters/alpha-court: scan_court(court) only reports court/bad.py",
+    "staged: bad index + clean disk → rc=1; non-utf8 → rc=1; .py symlink mode 120000 → rc=1; unreadable/parse-fail fail-closed",
+    "symlink dir end-to-end: court/sub→adapters + judge3 import court.sub → scan []; --staged rc=0 PASS",
+    "dynamic gaps: secondary rebind import_module, __import__ assign, builtins.__import__, getattr, partial, methodcaller, builtins.exec → all PASS",
+    "direct dynamic happy paths still FLAG: importlib.import_module('qlib'), __import__('x'), from importlib import import_module as imp; imp('x'), il.import_module('x'), nonliteral, bare exec",
+    "honesty probes: def judge(cal)/DAYS=252/hard path/sys.path.insert → PASS as declared",
+    "python -c stdlib probe: 301 names; zero market candidates in set; antigravity/this in; __main__ out"
+  ]
+}

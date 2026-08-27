@@ -1,0 +1,59 @@
+{
+  "ticket_id": "v0.1-10a",
+  "status": "done",
+  "summary": "Implemented adapters.qlib_cn.QlibCNFactorEvaluator per adapter-interface.md §7: qlib.init(kernels=1), one-shot label+PIT load, evaluate/evaluate_shifted via one shared kernel, RankIC and quantile long-short returns, §7.4 meta (including data_version triple and cost_declaration). Tests written first from §7.5 (oracle vs calc_ic/calc_long_short_return, array_equal equivalence including δ=0, same-process determinism, SH600519 convention spot-check with data skip guard). court/ left untouched; adapters/__init__.py lazy-exports so import adapters stays qlib-free.",
+  "branch": "dispatch/v01-10a-adapter-20260711-001636",
+  "commit": "0bd0567b729b62dce5a7bd3e1359bf6df5932cda",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v01-10a-adapter-20260711-001636",
+  "files_changed": [
+    {
+      "path": "adapters/qlib_cn.py",
+      "action": "added",
+      "purpose": "QlibCN factor evaluator: shared kernel, EvalResult/EvalGrid, construction and evaluation API"
+    },
+    {
+      "path": "adapters/__init__.py",
+      "action": "modified",
+      "purpose": "Lazy-export evaluator types without importing qlib at package import time"
+    },
+    {
+      "path": "tests/test_adapter_qlib_cn.py",
+      "action": "added",
+      "purpose": "§7.5 oracle, equivalence, determinism, and SH600519 convention tests (TDD first)"
+    }
+  ],
+  "self_test": [
+    {
+      "cmd": "python3.11 -m venv .venv && .venv/bin/python -m pip install -e \".[dev,qlib]\"",
+      "exit_code": 0,
+      "output_tail": "Successfully installed ... alpha-court-0.1.0.dev0 ... pyqlib-0.9.7 pytest-9.1.1 ruff-0.15.21"
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest -q",
+      "exit_code": 0,
+      "output_tail": "139 passed in 3.04s"
+    },
+    {
+      "cmd": ".venv/bin/ruff check .",
+      "exit_code": 0,
+      "output_tail": "All checks passed!"
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest tests/test_smoke.py -q",
+      "exit_code": 0,
+      "output_tail": "2 passed in 1.27s"
+    },
+    {
+      "cmd": "git status --porcelain",
+      "exit_code": 0,
+      "output_tail": ""
+    }
+  ],
+  "deviations": [
+    "evaluate_shifted validates 0 <= δ < T (allows δ=0 for the contractual §7.3 equivalence invariant) rather than a strict 0 < δ < T reject; generation-protocol δ_min remains caller-owned.",
+    "QlibCNFactorEvaluator.from_panels(...) is a test/synthetic constructor (not in the §7.1 production table) so oracle/equivalence/determinism run without the 813MB pack; production path remains QlibCNFactorEvaluator(config) with qlib.init.",
+    "IC path precomputes per-row ranks then pairs under the joint finite+PIT mask (exact vs pandas/qlib spearman on dense panels; sparse-NaN ranks use each series' own finite support before pairing)."
+  ],
+  "open_questions": [],
+  "notes_for_referee": "TDD: tests/test_adapter_qlib_cn.py written from §7.5 before implementation (stated). Grid benchmark on real pack window 2024-07-03→2026-07-03 (T=483, N=336 instruments): init_sec≈1.705; evaluate_shifted ic 1×199 offsets ≈1.328s; returns 1×199 ≈1.038s. Full 100×199 IC extrapolates ~2 min. Commit message: v0.1-10a: qlib_cn adapter. egg-info dirty from editable install was restored (out of allowed file set) so porcelain is empty."
+}

@@ -1,0 +1,66 @@
+{
+  "ticket_id": "v0.2-10a",
+  "status": "partial",
+  "summary": "Refactored scripts/dispatch.sh so the two grok-specific seams live in worker_invoke (CMD flag set + run to RAW) and worker_extract_receipt (calls scripts/dispatch_receipt.py). Added dependency-free commander-side extract+validate (stdlib json only): structuredOutput with text concat-decode fallback, schema-driven structural checks, exit 3/4 fail-closed. Documented the a–d worker contract and two-seam design in docs/agents/worker-bridge.md. Added 11 pytest cases in tests/test_dispatch_receipt.py (TDD red then green).",
+  "branch": "dispatch/v02-10a-dispatch-seam-20260716-232934",
+  "commit": "2b5dae01b544543c5e40ec0b5b28da309877357d",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v02-10a-dispatch-seam-20260716-232934",
+  "files_changed": [
+    {
+      "path": "scripts/dispatch_receipt.py",
+      "action": "added",
+      "purpose": "stdlib extract+validate CLI; commander-side receipt schema gate"
+    },
+    {
+      "path": "scripts/dispatch.sh",
+      "action": "modified",
+      "purpose": "worker_invoke / worker_extract_receipt seams + a–d contract header"
+    },
+    {
+      "path": "docs/agents/worker-bridge.md",
+      "action": "modified",
+      "purpose": "Worker generalization section; single a–d contract; validation why"
+    },
+    {
+      "path": "tests/test_dispatch_receipt.py",
+      "action": "added",
+      "purpose": "11 tests: valid/fallback/exit4/six exit3 cases/notes_for_referee"
+    }
+  ],
+  "self_test": [
+    {
+      "cmd": "python3 -m pytest tests/test_dispatch_receipt.py -v  # red: before dispatch_receipt.py existed",
+      "exit_code": 1,
+      "output_tail": "11 failed in 0.27s — can't open file '.../scripts/dispatch_receipt.py': [Errno 2] No such file or directory"
+    },
+    {
+      "cmd": "bash -n scripts/dispatch.sh",
+      "exit_code": 0
+    },
+    {
+      "cmd": "python3 -m ruff check scripts/dispatch_receipt.py tests/test_dispatch_receipt.py",
+      "exit_code": 0,
+      "output_tail": "All checks passed!"
+    },
+    {
+      "cmd": "python3 -m pytest tests/test_dispatch_receipt.py -v",
+      "exit_code": 0,
+      "output_tail": "11 passed in 0.33s"
+    },
+    {
+      "cmd": "python3 scripts/dispatch_receipt.py .scratch/dispatch/v0.2-09-aggregation-policy/raw-20260713-160854.json scripts/receipt.schema.json /tmp/r.json",
+      "exit_code": 0,
+      "output_tail": "[dispatch] status:   partial\n[dispatch] branch:   dispatch/v02-09-aggregation-policy-20260713-160854\n[dispatch] commit:   ea2144200dfcf1356a638c7dc0de84a4532453e3\n[dispatch] worktree: [HOME]/.alpha-court/dispatch-worktrees/v02-09-aggregation-policy-20260713-160854"
+    },
+    {
+      "cmd": "python3 -m pytest",
+      "exit_code": 1,
+      "output_tail": "FAILED tests/test_court_import_gate.py::test_staged_non_court_py_ignored\nFAILED tests/test_court_import_gate.py::test_staged_clean_court_passes\n2 failed, 469 passed, 1 skipped in 673.00s (0:11:13)"
+    }
+  ],
+  "deviations": [
+    "AC4 full suite did not exit 0: 2 failures in tests/test_court_import_gate.py staged-mode tests (ModuleNotFoundError: court.judge when cwd is a temp mini-repo that shadows court/ on sys.path). Failures reproduce without our code path and are outside file ownership; not fixed in this ticket. Ticket ACs 1–3,5–7 pass."
+  ],
+  "open_questions": [],
+  "notes_for_referee": "Behavior-preserving claim — blocks moved byte-for-byte into/kept as:\n- CMD grok flag set (prompt-file/cwd/output-format/json-schema/permission-mode auto/reasoning-effort/max-turns + best-of-n/model appends): now inside worker_invoke; same flags/order.\n- set +e; invoke; GROK_EXIT=$?; set -e guard: kept at call site around worker_invoke (not a bare worker_invoke; GROK_EXIT=$? under set -e).\n- post-flight tripwire exit 2 block: unchanged text/logic.\n- HEAD-moved warning block: unchanged.\n- trap '' PIPE: unchanged at top.\n- worktree/branch mechanics (STATUS_PATHSPEC, git worktree add, CONTRACT FROZEN, WT_PATH/WT_BRANCH): unchanged.\n- if [ \"$GROK_EXIT\" -ne 0 ] graceful branch: unchanged.\n- final referee-checklist echo: unchanged.\nChanged lines: header now documents a–d worker contract; CMD+run moved into worker_invoke; inline python heredoc replaced by worker_extract_receipt → scripts/dispatch_receipt.py (adds commander-side validation; exit 3 invalid / 4 missing); session line now a separate python3 -c on RAW (extractor does not print session).\ngit diff --stat BASE..HEAD touches only the four owned files."
+}

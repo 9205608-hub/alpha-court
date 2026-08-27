@@ -1,0 +1,55 @@
+{
+  "ticket_id": "v0.1-08a",
+  "status": "done",
+  "summary": "Implemented append-only trial ledger in court/ledger.py: frozen record types (SeConvention, Window, DeclaredProtocol, Series, HypothesisRecord, TrialRecord, VerdictRecord), LedgerCorruptionError, and Ledger with JSONL event log (hypothesis/trial/evaluation/verdict). Open replays into an in-memory index with torn-final-line truncate+fsync and mid-file/invariant failures as LedgerCorruptionError. Write path uses json.dumps(allow_nan=False)+flush+fsync; status is derived (registered/evaluated/judged); matrix returns label-for-label aligned float64 T×N columns in trial_ids order. tests/test_ledger.py covers happy path, line order, matrix alignment, §5.7 guards, and storage/replay (25 tests).",
+  "branch": "dispatch/v01-08a-ledger-r2-20260710-221535",
+  "commit": "cb9189aac350c77e4ccaeae512ee3395e45b35b7",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v01-08a-ledger-r2-20260710-221535",
+  "files_changed": [
+    {
+      "path": "court/ledger.py",
+      "action": "added",
+      "purpose": "Append-only JSONL trial ledger: records, durable append, replay, read surface, fail-closed guards per §5.7"
+    },
+    {
+      "path": "tests/test_ledger.py",
+      "action": "added",
+      "purpose": "Behavioral tests written first (TDD): contract, storage/replay, matrix, every §5.7 raise row"
+    }
+  ],
+  "self_test": [
+    {
+      "cmd": "python3 -m venv .venv && .venv/bin/python -m pip install -e \".[dev]\"",
+      "exit_code": 0,
+      "output_tail": "Successfully installed alpha-court-0.1.0.dev0 iniconfig-2.3.0 numpy-2.5.1 packaging-26.2 pandas-3.0.3 pluggy-1.6.0 pygments-2.20.0 pytest-9.1.1 python-dateutil-2.9.0.post0 ruff-0.15.21 scipy-1.18.0 six-1.17.0"
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest tests/test_ledger.py -v",
+      "exit_code": 0,
+      "output_tail": "tests/test_ledger.py::test_sequential_ids_across_types PASSED [100%]\n============================== 25 passed in 0.09s =============================="
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest",
+      "exit_code": 0,
+      "output_tail": "...........................                                              [100%]\n27 passed in 0.11s"
+    },
+    {
+      "cmd": ".venv/bin/ruff check .",
+      "exit_code": 0,
+      "output_tail": "All checks passed!"
+    },
+    {
+      "cmd": "git show --stat HEAD",
+      "exit_code": 0,
+      "output_tail": " court/ledger.py      | 601 +++++++++++++++++++++++++++++++++++++++++++++++++++\n tests/test_ledger.py | 525 ++++++++++++++++++++++++++++++++++++++++++++\n 2 files changed, 1126 insertions(+)"
+    },
+    {
+      "cmd": "git status --porcelain",
+      "exit_code": 0,
+      "output_tail": ""
+    }
+  ],
+  "deviations": [],
+  "open_questions": [],
+  "notes_for_referee": "TDD order observed: tests/test_ledger.py was written and collected first (import failure / red), then court/ledger.py implemented to green. source_ref is always None on register (exact §5.7 signature has no source_ref parameter). verdicts(trial_id=...) filters to verdicts where trial_id is in scope or decisions."
+}

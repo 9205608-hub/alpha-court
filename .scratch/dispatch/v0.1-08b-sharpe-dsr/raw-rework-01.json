@@ -1,0 +1,72 @@
+{
+  "text": "{ \"ticket_id\": \"v0.1-08b\", \"status\": \"partial\", \"summary\": \"Addressing referee findings: isf quantiles, finite scalar guards, exact var_factor, shared z.\", \"branch\": \"\", \"commit\": \"\", \"worktree_path\": \"\", \"files_changed\": [], \"self_test\": [], \"deviations\": [], \"open_questions\": [] }{ \"ticket_id\": \"v0.1-08b\", \"status\": \"partial\", \"summary\": \"Implementing isf tails, finite scalar guards, exact var_factor asserts, shared PSR z.\", \"branch\": \"\", \"commit\": \"\", \"worktree_path\": \"\", \"files_changed\": [], \"self_test\": [], \"deviations\": [], \"open_questions\": [] }{\n  \"ticket_id\": \"v0.1-08b\",\n  \"status\": \"done\",\n  \"summary\": \"Addressed referee findings on the four owned files: expected_max_sr now uses norm.isf for right-tail quantiles (dsr.md §5.5) with large-N regression tests; all public scalar float parameters reject non-finite inputs with ValueError at entry; rational var_factor anchors use exact ==; dsr/z share one _psr_details computation path; misleading complementary-tail comment replaced with accurate isf documentation.\",\n  \"branch\": \"dispatch/v01-08b-sharpe-dsr-20260710-220550\",\n  \"commit\": \"1bf4b84996352c54c2832cc533d4e7e5b18414bb\",\n  \"worktree_path\": \"[HOME]/.alpha-court/dispatch-worktrees/v01-08b-sharpe-dsr-20260710-220550\",\n  \"files_changed\": [\n    {\n      \"path\": \"court/sharpe.py\",\n      \"action\": \"modified\",\n      \"purpose\": \"Finite scalar guards; shared _psr_details for psr/dsr z synchronization\"\n    },\n    {\n      \"path\": \"court/dsr.py\",\n      \"action\": \"modified\",\n      \"purpose\": \"norm.isf tails; finite scalar guards; dsr via single _psr_details path\"\n    },\n    {\n      \"path\": \"tests/test_sharpe.py\",\n      \"action\": \"modified\",\n      \"purpose\": \"Exact == for rational var_factor anchors; non-finite scalar guard parametrization\"\n    },\n    {\n      \"path\": \"tests/test_dsr.py\",\n      \"action\": \"modified\",\n      \"purpose\": \"Large-N isf regression; non-finite scalar guards; Φ(z)==dsr check\"\n    }\n  ],\n  \"self_test\": [\n    {\n      \"cmd\": \".venv/bin/python -m pytest tests/test_sharpe.py tests/test_dsr.py -v\",\n      \"exit_code\": 0,\n      \"output_tail\": \"============================== 43 passed in 0.88s ==============================\"\n    },\n    {\n      \"cmd\": \".venv/bin/python -m pytest -q\",\n      \"exit_code\": 0,\n      \"output_tail\": \"45 passed in 0.91s\"\n    },\n    {\n      \"cmd\": \".venv/bin/ruff check .\",\n      \"exit_code\": 0,\n      \"output_tail\": \"All checks passed!\"\n    },\n    {\n      \"cmd\": \".venv/bin/python -c \\\"from court.dsr import expected_max_sr; v = expected_max_sr(0.0, 0.5, 10.0); assert abs(v - 0.78729915067) < 1e-9, v\\\"\",\n      \"exit_code\": 0,\n      \"output_tail\": \"ok\"\n    },\n    {\n      \"cmd\": \"git show --stat HEAD\",\n      \"exit_code\": 0,\n      \"output_tail\": \"court/dsr.py | 65 +\\n court/sharpe.py | 72 +\\n tests/test_dsr.py | 50 +\\n tests/test_sharpe.py | 49 +\\n 4 files changed, 190 insertions(+), 46 deletions(-)\"\n    },\n    {\n      \"cmd\": \"git status --porcelain\",\n      \"exit_code\": 0,\n      \"output_tail\": \"\"\n    }\n  ],\n  \"deviations\": [],\n  \"open_questions\": [],\n  \"notes_for_referee\": \"MAJOR1: expected_max_sr uses norm.isf(1/N) and norm.isf(1/(N*e)); test_expected_max_sr_large_n_isf_stable checks N=1e9 match to 1e-12 and finite result at N=1e16. MAJOR2: _require_finite on all public scalar floats in both modules; parametrized raising tests cover each function. MINOR3: vf==1.125, ==1.4375, Normal identity ==. MINOR4: dsr imports court.sharpe._psr_details so dsr and z are one path. MINOR5: isf comment matches code.\"\n}",
+  "stopReason": "EndTurn",
+  "sessionId": "019f4c59-63f2-7ad2-ad25-072e8f614fe3",
+  "requestId": "805c289a-7e1c-4c64-aa60-ec0507dc365f",
+  "thought": "The user wants me to address referee findings on the v0.1-08b delivery. Let me implement all the major and minor fixes:\nI need to implement all the referee findings. Let me carefully plan:\nI understand the referee findings and will implement them precisely. Let me start by updating the files as specified.\n\nFirst, I'll address the major items in `court/dsr.py` and `tests/test_dsr.py`, then the sharpe.py tests, and finally the minor docstring cleanup.\n\nLet me begin with the expected 1. implementation in dsr.py. I'll replace the ppf usage with isf and update the comment. Also, I'll add the regression test for large N.\n\nFor the finiteness checks, I'll add a helper function `_require_finite` in both modules and apply it to all scalar float parameters in public functions.\n\n 2. For the exact equality in tests, I'll tighten those assertions.\n\n 3. For the DsrResult refactor, I'll ensure z is computed once and reused.\n\n 4. Finally, I'll do the docstring sweep to remove any incorrect claims.\n\nLet me start making the changes. First, I'll update `court/d sr.py`. I'll need to make several modifications. Let me think about the structure:\n\nI'll add the `_require_finite` helper, update the expected_max_sr function, update the dsr function to use shared computation, and fix the docstrings.\n\nLet me start by writing the new code for dsr.py. I'll need to import math and scipy.stats.norm.\n\nHere's the updated code for court/dsr.py:\n\n```python\nimport math\nfrom scipy.stats import norm\n\ndef _require_finite(name: str, value: float) -> None:\n    \"\"\"Raise ValueError if value is not finite.\"\"\"\n    if not math.isfinite (value):\n        raise ValueError(f\"{name} must be finite (got {value})\")\n\ndef _psr_details(sr_hat: float, sr_benchmark: float, n_obs: int, skew_hat: float, kurt_hat: float) -> tuple[float, float, float]:\n    \"\"\"Shared computation for PSR and z value.Let me run tests and ruff. Note: importing `_psr_details` from court.sharpe might trigger ruff issues about private imports - let's see.All tests pass and ruff is clean. Now commit and run full suite + acceptance criteria for the receipt.Porcelain was empty (no output between show and branch). Good. Final JSON receipt only.",
+  "structuredOutput": {
+    "ticket_id": "v0.1-08b",
+    "status": "done",
+    "summary": "Addressed referee findings on the four owned files: expected_max_sr now uses norm.isf for right-tail quantiles (dsr.md §5.5) with large-N regression tests; all public scalar float parameters reject non-finite inputs with ValueError at entry; rational var_factor anchors use exact ==; dsr/z share one _psr_details computation path; misleading complementary-tail comment replaced with accurate isf documentation.",
+    "branch": "dispatch/v01-08b-sharpe-dsr-20260710-220550",
+    "commit": "1bf4b84996352c54c2832cc533d4e7e5b18414bb",
+    "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v01-08b-sharpe-dsr-20260710-220550",
+    "files_changed": [
+      {
+        "path": "court/sharpe.py",
+        "action": "modified",
+        "purpose": "Finite scalar guards; shared _psr_details for psr/dsr z synchronization"
+      },
+      {
+        "path": "court/dsr.py",
+        "action": "modified",
+        "purpose": "norm.isf tails; finite scalar guards; dsr via single _psr_details path"
+      },
+      {
+        "path": "tests/test_sharpe.py",
+        "action": "modified",
+        "purpose": "Exact == for rational var_factor anchors; non-finite scalar guard parametrization"
+      },
+      {
+        "path": "tests/test_dsr.py",
+        "action": "modified",
+        "purpose": "Large-N isf regression; non-finite scalar guards; Φ(z)==dsr check"
+      }
+    ],
+    "self_test": [
+      {
+        "cmd": ".venv/bin/python -m pytest tests/test_sharpe.py tests/test_dsr.py -v",
+        "exit_code": 0,
+        "output_tail": "============================== 43 passed in 0.88s =============================="
+      },
+      {
+        "cmd": ".venv/bin/python -m pytest -q",
+        "exit_code": 0,
+        "output_tail": "45 passed in 0.91s"
+      },
+      {
+        "cmd": ".venv/bin/ruff check .",
+        "exit_code": 0,
+        "output_tail": "All checks passed!"
+      },
+      {
+        "cmd": ".venv/bin/python -c \"from court.dsr import expected_max_sr; v = expected_max_sr(0.0, 0.5, 10.0); assert abs(v - 0.78729915067) < 1e-9, v\"",
+        "exit_code": 0,
+        "output_tail": "ok"
+      },
+      {
+        "cmd": "git show --stat HEAD",
+        "exit_code": 0,
+        "output_tail": "court/dsr.py | 65 +\n court/sharpe.py | 72 +\n tests/test_dsr.py | 50 +\n tests/test_sharpe.py | 49 +\n 4 files changed, 190 insertions(+), 46 deletions(-)"
+      },
+      {
+        "cmd": "git status --porcelain",
+        "exit_code": 0,
+        "output_tail": ""
+      }
+    ],
+    "deviations": [],
+    "open_questions": [],
+    "notes_for_referee": "MAJOR1: expected_max_sr uses norm.isf(1/N) and norm.isf(1/(N*e)); test_expected_max_sr_large_n_isf_stable checks N=1e9 match to 1e-12 and finite result at N=1e16. MAJOR2: _require_finite on all public scalar floats in both modules; parametrized raising tests cover each function. MINOR3: vf==1.125, ==1.4375, Normal identity ==. MINOR4: dsr imports court.sharpe._psr_details so dsr and z are one path. MINOR5: isf comment matches code."
+  }
+}

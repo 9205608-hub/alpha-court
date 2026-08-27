@@ -1,0 +1,64 @@
+{
+  "ticket_id": "v0.1-09",
+  "status": "done",
+  "summary": "Researched three qlib China daily acquisition routes (official GetData CLI, chenditc/investment_data community release, dump-your-own). Installed pyqlib 0.9.7 in a worktree .venv on Python 3.11.2 arm64. Official CLI download succeeded but the pack ends 2020-09-25; community release 2026-07-05 was written to ~/.qlib/qlib_data/cn_data (813M, 193s). Smoke validation: calendar 2000-01-04..2026-07-03, 6114 instruments, csi300 ~2y panel 145309 rows with ~0.17% NaN on OHLCV. Wrote findings and v0.1 demo recommendation to docs/research/qlib-cn-data.md only.",
+  "branch": "dispatch/v01-09-qlibcn-20260710-171748",
+  "commit": "76ac94149d58e653527e80abe772ee018fc24adb",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v01-09-qlibcn-20260710-171748",
+  "files_changed": [
+    {
+      "path": "docs/research/qlib-cn-data.md",
+      "action": "added",
+      "purpose": "Acquisition path comparison, measured install/download/smoke numbers, v0.1 demo recommendation, open risks"
+    }
+  ],
+  "self_test": [
+    {
+      "cmd": "python3.11 -m venv .venv && source .venv/bin/activate && pip install pyqlib && python -c \"import qlib; print(qlib.__version__)\"",
+      "exit_code": 0,
+      "output_tail": "qlib 0.9.7"
+    },
+    {
+      "cmd": "python -m qlib.cli.data qlib_data --target_dir ~/.qlib/qlib_data/cn_data_official_probe --region cn",
+      "exit_code": 0,
+      "output_tail": "official_exit=0\n(calendar probe later measured last day 2020-09-25)"
+    },
+    {
+      "cmd": "curl -L --fail -o /tmp/qlib_bin.tar.gz https://github.com/chenditc/investment_data/releases/latest/download/qlib_bin.tar.gz && tar -zxvf /tmp/qlib_bin.tar.gz -C ~/.qlib/qlib_data/cn_data --strip-components=1 && du -sh ~/.qlib/qlib_data/cn_data",
+      "exit_code": 0,
+      "output_tail": "download_exit=0\nextract_exit=0\nDURATION_SEC=193\nDONE\n813M\t[HOME]/.qlib/qlib_data/cn_data"
+    },
+    {
+      "cmd": "source .venv/bin/activate && python /tmp/qlib_smoke_v01_09.py",
+      "exit_code": 0,
+      "output_tail": "n_trading_days 6420\nfirst 2000-01-04\nlast 2026-07-03\nall_count 6114\nrow_count 145309\nnan_rate $close: 0.001665\n=== DONE smoke ===\nsmoke_exit=0"
+    },
+    {
+      "cmd": "test -f docs/research/qlib-cn-data.md",
+      "exit_code": 0
+    },
+    {
+      "cmd": "test -d ~/.qlib/qlib_data/cn_data",
+      "exit_code": 0
+    },
+    {
+      "cmd": "git status --porcelain",
+      "exit_code": 0,
+      "output_tail": ""
+    },
+    {
+      "cmd": "git log --oneline -1",
+      "exit_code": 0,
+      "output_tail": "76ac941 v0.1-09: qlib-cn data availability"
+    }
+  ],
+  "deviations": [
+    "Official GetData was expected to be fully disabled per README/#1547; on this machine it downloaded successfully but the pack is stale (ends 2020-09-25). Primary pack used for smoke is the community release, as recommended.",
+    "Smoke script required kernels=1 and a file-based entrypoint; stdin python -c/heredoc hit macOS multiprocessing spawn FileNotFoundError on <stdin>."
+  ],
+  "open_questions": [
+    "Exact semantic definition of $adjclose vs $close/$factor in the community pack (cash CNY vs internal scale) needs adapter-side unit tests before emitting prices to the kernel.",
+    "Whether v0.1 should pin a specific investment_data release tag (e.g. 2026-07-05) for bit-for-bit reproducibility instead of latest."
+  ],
+  "notes_for_referee": "Primary evidence in docs/research/qlib-cn-data.md. Data lives at ~/.qlib/qlib_data/cn_data (813M, last day 2026-07-03). Official probe left at ~/.qlib/qlib_data/cn_data_official_probe for comparison only (stale through 2020-09-25). Only repo file changed: the research doc."
+}

@@ -1,0 +1,70 @@
+{
+  "ticket_id": "v0.3-01",
+  "status": "partial",
+  "summary": "Added gates/base.py with align (inner-join on index, series_a order) and make_report (deep-cast numpy scalars; ValueError on non-finite floats). IdentityDegeneracyBlade scans |spearmanr| over refs × lags |k'|≤k, skips/counts insufficient-overlap and degenerate pairs, flags when max ≥ rho_max, and reports max/second-max plus n_effective_hypotheses=|refs|×(2k+1). PoolRedundancyBlade compares the candidate to each pool member at lag 0 with both pearsonr and spearmanr, reports max and top-5 for each, and flags when either max ≥ rho_pool. gates/__init__.py exports both classes. tests/test_gates_identity_pool.py covers lag-copy, noise, second-max, min_overlap/all-skipped, constant-ref JSON, pearson/spearman divergence, CertifiedRun screen/record smoke, and determinism.",
+  "branch": "dispatch/v0.3-01-identity-pool-20260813-170918",
+  "commit": "eae980e475e4c1fbb05c61695ccd7c59498c0fed",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v0.3-01-identity-pool-20260813-170918",
+  "files_changed": [
+    {
+      "path": "gates/__init__.py",
+      "action": "modified",
+      "purpose": "Export IdentityDegeneracyBlade and PoolRedundancyBlade; document v0.3 blade set."
+    },
+    {
+      "path": "gates/base.py",
+      "action": "added",
+      "purpose": "Minimal align + make_report helpers used by the two blades on this ticket."
+    },
+    {
+      "path": "gates/identity_degeneracy.py",
+      "action": "added",
+      "purpose": "IdentityDegeneracyBlade: lagged |spearmanr| vs refs, rho_max as constructor input."
+    },
+    {
+      "path": "gates/pool_redundancy.py",
+      "action": "added",
+      "purpose": "PoolRedundancyBlade: lag-0 |pearsonr| and |spearmanr| vs pool, rho_pool as constructor input."
+    },
+    {
+      "path": "tests/test_gates_identity_pool.py",
+      "action": "added",
+      "purpose": "Red-first tests for blades a–g including CertifiedRun screen/record smoke."
+    }
+  ],
+  "self_test": [
+    {
+      "cmd": "python3 -m pytest tests/test_gates_identity_pool.py -q",
+      "exit_code": 2,
+      "output_tail": "tests/test_gates_identity_pool.py:18: in <module>\n    from gates.identity_degeneracy import IdentityDegeneracyBlade\nE   ModuleNotFoundError: No module named 'gates.identity_degeneracy'\n=========================== short test summary info ============================\nERROR tests/test_gates_identity_pool.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 2.58s"
+    },
+    {
+      "cmd": "python3 -m pytest tests/test_gates_identity_pool.py -v",
+      "exit_code": 0,
+      "output_tail": "tests/test_gates_identity_pool.py::test_constant_ref_skipped_report_json_serializable PASSED [ 60%]\ntests/test_gates_identity_pool.py::test_pool_reports_both_measures_and_flags_on_spearman PASSED [ 70%]\ntests/test_gates_identity_pool.py::test_identity_report_is_deterministic PASSED [ 80%]\ntests/test_gates_identity_pool.py::test_pool_report_is_deterministic PASSED [ 90%]\ntests/test_gates_identity_pool.py::test_certified_run_screens_lag_copy_and_records_innocent PASSED [100%]\n\n============================== 10 passed in 1.71s =============================="
+    },
+    {
+      "cmd": "python3 -m pytest -q",
+      "exit_code": 1,
+      "output_tail": "    def test_evaluate_shifted_ic_dense_panel_under_3s():\nE       AssertionError: evaluate_shifted(199) took 3.450s (budget 3.0s)\nE       assert 3.4501056666485965 < 3.0\ntests/test_adapter_kernel_perf.py:269: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_dense_panel_under_3s\n1 failed, 592 passed, 2 skipped in 355.37s (0:05:55)"
+    },
+    {
+      "cmd": "python3 -m pytest tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_dense_panel_under_3s tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_churn_panel_under_5s tests/test_sharpe_perf.py::test_pbo_via_judge_completes_under_five_seconds -v --tb=line",
+      "exit_code": 1,
+      "output_tail": "tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_dense_panel_under_3s FAILED [ 33%]\ntests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_churn_panel_under_5s PASSED [ 66%]\ntests/test_sharpe_perf.py::test_pbo_via_judge_completes_under_five_seconds PASSED [100%]\nE   AssertionError: evaluate_shifted(199) took 3.225s (budget 3.0s)\n    assert 3.2251024171710014 < 3.0\n========================= 1 failed, 2 passed in 12.46s ========================="
+    },
+    {
+      "cmd": "ruff check .",
+      "exit_code": 0,
+      "output_tail": "All checks passed!"
+    }
+  ],
+  "deviations": [
+    "AC2 python3 -m pytest -q exited 1: tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_dense_panel_under_3s was 3.450s then 3.225s on re-run (budget 3.0s). The other two known wall-clock tests passed on re-run. This ticket does not touch adapters/ or court/sharpe.py."
+  ],
+  "open_questions": [
+    "Pool statistics keys were unnamed in the ticket; used top5_abs_pearson / top5_abs_spearman and params n_pool (parallel to identity n_refs).",
+    "Positive lag k' means candidate[t] vs ref[t-k'] after inner-join on labels (the planted lag-2 construction)."
+  ],
+  "notes_for_referee": "BASE=180987930cc667183eab0b09311f57005bc6eb9d. git diff --stat BASE..HEAD is the five owned files only. TDD red was collection ImportError (exit 2) before the gates modules existed. Thresholds are constructor-only; scipy.stats.spearmanr / pearsonr are the correlation implementations."
+}

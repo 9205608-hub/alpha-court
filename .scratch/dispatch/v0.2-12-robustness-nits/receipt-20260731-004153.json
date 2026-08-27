@@ -1,0 +1,12 @@
+{
+  "ticket_id": "v0.2-12",
+  "status": "partial",
+  "summary": "Slice A green. Writing and confirming red tests for Slice B validation symmetry.",
+  "branch": "dispatch/v0.2-12-robustness-nits-20260731-004153",
+  "commit": "52566a27bbe1b0ec6241747bf341d42cd085f760",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v0.2-12-robustness-nits-20260731-004153",
+  "files_changed": [],
+  "self_test": [],
+  "deviations": [],
+  "open_questions": []
+}

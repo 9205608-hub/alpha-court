@@ -1,0 +1,62 @@
+{
+  "ticket_id": "v0.2-06",
+  "status": "partial",
+  "summary": "Extended court/ledger.py with source_ref on register, optional attestation on record (fail-closed vs declared; replay raises LedgerCorruptionError), content hash-chain (canonical_json float pre-transform, chain_head, homogeneous legacy/chained mode, mid-file tamper detection, torn-line recovery, honest suffix-truncation boundary), and court-opaque declaration/seal events with post-seal mutation guards. Added tests/test_ledger_chain.py with 31 new tests. Existing test_ledger.py unchanged; full suite 219 passed.",
+  "branch": "dispatch/v02-06-ledger-evidence-20260713-003354",
+  "commit": "a6abc9b4818c1f722a579b5c5022f5bddff12a5f",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v02-06-ledger-evidence-20260713-003354",
+  "files_changed": [
+    {
+      "path": "court/ledger.py",
+      "action": "modified",
+      "purpose": "source_ref, attestation, hash chain, declaration/seal evidence layer"
+    },
+    {
+      "path": "tests/test_ledger_chain.py",
+      "action": "added",
+      "purpose": "31 TDD tests for chain/legacy/attestation/seal"
+    }
+  ],
+  "self_test": [
+    {
+      "cmd": "python3 -m venv .venv && .venv/bin/python -m pip install -e \".[dev,demo]\"",
+      "exit_code": 0,
+      "output_tail": "Successfully installed alpha-court-0.1.0.dev0 ... ruff-0.15.21 scipy-1.18.0"
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest tests/test_ledger_chain.py -v --tb=line",
+      "exit_code": 2,
+      "output_tail": "ImportError: cannot import name 'DeclarationRecord' from 'court.ledger'\nERROR tests/test_ledger_chain.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n=============================== 1 error in 1.01s ==============================="
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest tests/test_ledger.py tests/test_ledger_chain.py -v",
+      "exit_code": 0,
+      "output_tail": "56 passed in 1.39s"
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest tests/test_ledger.py tests/test_ledger_chain.py -q",
+      "exit_code": 0,
+      "output_tail": "56 passed in 1.33s"
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest",
+      "exit_code": 0,
+      "output_tail": "219 passed, 1 skipped in 664.81s (0:11:04)"
+    },
+    {
+      "cmd": ".venv/bin/ruff check .",
+      "exit_code": 1,
+      "output_tail": "Found 30 errors.\n[*] 8 fixable with the `--fix` option (3 hidden fixes can be enabled with the `--unsafe-fixes` option)."
+    },
+    {
+      "cmd": ".venv/bin/ruff check court/ledger.py tests/test_ledger.py tests/test_ledger_chain.py",
+      "exit_code": 0,
+      "output_tail": "All checks passed!"
+    }
+  ],
+  "deviations": [
+    "AC-4 `.venv/bin/ruff check .` exits 1 due to 30 pre-existing lint errors under tracked `.scratch/` (confirmed identical failure at BASE b4897c68 with this ticket's files stashed). Owned paths `court/ledger.py`, `tests/test_ledger.py`, `tests/test_ledger_chain.py` are ruff-clean. Ticket forbids touching non-owned files, so `.scratch` was not fixed."
+  ],
+  "open_questions": [],
+  "notes_for_referee": "TDD: red run recorded as collection ImportError (exit 2) before DeclarationRecord/chain implementation; green is 56 ledger tests (25 baseline + 31 new in test_ledger_chain.py, including honesty-boundary suffix truncation and killer-demo legacy replay). BASE=b4897c685e75c7805eebd2352da3fbc4f753e459; git diff --stat BASE..HEAD touches only court/ledger.py and tests/test_ledger_chain.py. tests/test_ledger.py was not modified."
+}

@@ -1,0 +1,6 @@
+appendix rerun start 2026-07-19 20:53:18 head=8a1aff08
+[2247:MainThread](2026-07-19 20:53:20,131) INFO - qlib.Initialization - [config.py:452] - default_conf: client.
+[2247:MainThread](2026-07-19 20:53:20,732) INFO - qlib.Initialization - [__init__.py:75] - qlib successfully initialized based on client settings.
+[2247:MainThread](2026-07-19 20:53:20,732) INFO - qlib.Initialization - [__init__.py:77] - data_path={'__DEFAULT_FREQ': PosixPath('[HOME]/.qlib/qlib_data/cn_data')}
+[appendix-rerun] done
+=== APPENDIX EXIT=0 at 2026-07-20 18:20:37 ===

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# pre-merge-commit: a non-FF / conflicted merge DOES create a commit and does NOT fire
+# pre-commit — so we gate the merge result here too (closes the non-ff-merge hole).
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 1
+exec bash "$ROOT/.githooks/run-gates.sh" "$@"

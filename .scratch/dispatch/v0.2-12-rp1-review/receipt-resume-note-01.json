@@ -1,0 +1,133 @@
+{
+ "ticket_id": "v0.2-12-RP1",
+ "status": "done",
+ "summary": "Overall ACCEPT of subject commit 610f9f82 (worktree HEAD c45596a7 contains it): slices A–H match the frozen ticket; red evidence re-established for A/B/C (new tests fail on 52566a27 production code, green after restore); full suite 556 passed / 2 skipped, ruff clean, court-import-gate PASS; live attacks did not break A recovery or C rekeying. ACCEPT-WITH-FINDINGS on residual write/replay asymmetries outside the frozen B list (series validation, empty scope/statistic on replay) plus minor pin/docs notes — 1 major residual, 3 minor; not grounds to REJECT the delivered batch.",
+ "branch": "dispatch/v0.2-12-rp1-review-20260812-232459",
+ "commit": "c45596a70d307940adc36ee7d4572426978a27b2",
+ "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v0.2-12-rp1-review-20260812-232459",
+ "files_changed": [],
+ "self_test": [
+  {
+   "cmd": "git rev-parse HEAD; git status --porcelain; git merge-base --is-ancestor 610f9f82 HEAD",
+   "exit": 0,
+   "note": "HEAD c45596a7 clean; 610f9f82 ancestor"
+  },
+  {
+   "cmd": "git show 610f9f82 --stat; git diff 52566a27..610f9f82 --stat",
+   "exit": 0,
+   "note": "13 files in 610f9f82; full range also includes 828e9363 dispatch.sh fix"
+  },
+  {
+   "cmd": "git show 52566a27:court/ledger.py > court/ledger.py && python3 -m pytest tests/test_ledger.py::test_torn_recovery_byte_exact_with_non_ascii_intact_line tests/test_ledger.py::test_torn_multibyte_tail_recovers_instead_of_crashing tests/test_ledger.py::test_storage_lines_are_pure_ascii -q",
+   "exit": 1,
+   "note": "RED A: 2 failed (byte-offset corruption + UnicodeDecodeError), 1 passed (ASCII pin already green on old code)"
+  },
+  {
+   "cmd": "python3 -m pytest tests/test_ledger.py::test_replay_rejects_invalid_declared_metric tests/test_ledger.py::test_replay_rejects_invalid_decision_value tests/test_ledger.py::test_replay_rejects_invalid_role tests/test_ledger.py::test_append_verdict_rejects_decision_outside_scope tests/test_ledger.py::test_replay_rejects_decision_outside_scope -q",
+   "exit": 1,
+   "note": "RED B: 5 failed, all DID NOT RAISE on old ledger"
+  },
+  {
+   "cmd": "cp restored ledger; git show 52566a27:court/judge.py > court/judge.py; git show 52566a27:harness/run.py > harness/run.py && python3 -m pytest tests/test_judge.py::test_repeated_statistic_keeps_both_summaries tests/test_certified_run.py::test_judgment_payload_unknown_verdict_id_fails_closed -q",
+   "exit": 1,
+   "note": "RED C: 2 failed (statistic keys fdr_by/dsr vs verdict_ids)"
+  },
+  {
+   "cmd": "python3 probe _judgment_from_payload unknown vid on old harness/run.py",
+   "exit": 0,
+   "note": "NO_RAISE; returns incomplete decisions keyed by 'dsr' — silent skip confirmed"
+  },
+  {
+   "cmd": "git checkout HEAD -- court/ledger.py court/judge.py harness/run.py && python3 -m pytest <10 new A/B/C tests> -q",
+   "exit": 0,
+   "note": "GREEN ABC: 10 passed after restore"
+  },
+  {
+   "cmd": "python3 live attack slice A (torn/encoding cases beyond tests) → /tmp/rp1_attack_A.txt",
+   "exit": 0,
+   "note": "A1–A10: final non-dict JSON truncated; mid undecodable → LedgerCorruptionError; non-ASCII intact preserved; CRLF tolerated via json.loads trailing-ws"
+  },
+  {
+   "cmd": "python3 live attack slice B residual asymmetries → /tmp/rp1_attack_B.txt",
+   "exit": 0,
+   "note": "declared se/direction/ppy closed; series len/empty/NaN/dup-index ACCEPTED on replay; empty scope/statistic ACCEPTED on replay while write rejects"
+  },
+  {
+   "cmd": "python3 live attack slice C consumer grep + judge rekey → /tmp/rp1_attack_C.txt",
+   "exit": 0,
+   "note": "no production statistic-keyed Judgment.decisions; only docs/design/court-kernel-spec.md:489 stale"
+  },
+  {
+   "cmd": "python3 -m pytest -q",
+   "exit": 0,
+   "note": "556 passed, 2 skipped in 99.77s"
+  },
+  {
+   "cmd": "ruff check .",
+   "exit": 0,
+   "note": "All checks passed!"
+  },
+  {
+   "cmd": "python3 -m harness.court_import_gate --court court",
+   "exit": 0,
+   "note": "PASS — court/ imports only stdlib/__future__/court/numpy/scipy"
+  },
+  {
+   "cmd": "python3 -m pytest tests/test_killer_demo.py tests/test_certified_run.py tests/test_harness_verify.py tests/test_ledger.py tests/test_ledger_chain.py tests/test_judge.py -q",
+   "exit": 0,
+   "note": "157 passed (replay-compat surface)"
+  },
+  {
+   "cmd": "python3 -m pytest <new D/E/F/G/H tests> -q",
+   "exit": 0,
+   "note": "6 passed"
+  },
+  {
+   "cmd": "git status --porcelain; test -z clean",
+   "exit": 0,
+   "note": "CLEAN_OK — audit-only, no residual edits"
+  }
+ ],
+ "deviations": [
+  "Audited subject is 610f9f82; worktree HEAD is c45596a7 (timeline commit after 610f9f82). Diff judged was 52566a27..610f9f82; production probes used restored HEAD code after temporary 52566a27 checkouts.",
+  "Slice A storage-pin test is not red-on-old (ensure_ascii=True already held); still a valid invariant pin, not theater for the two recovery bugs.",
+  "Did not re-establish independent RED runs for D–H (ticket requires at least A/B/C); D–H new tests green on current tree only."
+ ],
+ "open_questions": [
+  {
+   "severity": "major",
+   "file:line": "court/ledger.py:569",
+   "claim": "Residual write/replay asymmetry: evaluation path still trusts series on replay (_series_from_dict only) while record() calls _validate_series (line 777). Hand-crafted legacy ledgers with length mismatch, empty series, NaN values, or duplicate index labels open cleanly and index the garbage.",
+   "evidence": "Live probe B5/B6/B7/B13 on current code: Ledger.open accepted Series(index=('d1','d2'), values=(1.0,)), empty Series, (nan,), and duplicate ('d1','d1'); write-side B12 still ValueError on length mismatch. Out of frozen slice-B list but remains after the batch."
+  },
+  {
+   "severity": "minor",
+   "file:line": "court/ledger.py:588-628",
+   "claim": "Residual verdict asymmetry: append_verdict rejects empty scope (810-811) and empty statistic (808-809); _apply_event verdict branch does not — forged empty scope/statistic replays.",
+   "evidence": "Live probe B8/B9 ACCEPTED_ASYM on open; B10/B11 write still rejects with 'scope must be non-empty' / 'statistic must be a non-empty string'."
+  },
+  {
+   "severity": "minor",
+   "file:line": "tests/test_ledger.py:580-590",
+   "claim": "test_storage_lines_are_pure_ascii is not red-first evidence: it passes against 52566a27 ledger (write path already ensure_ascii default).",
+   "evidence": "With court/ledger.py at 52566a27: pytest that test alone green (FF. pattern was only the two recovery tests red)."
+  },
+  {
+   "severity": "minor",
+   "file:line": "docs/design/court-kernel-spec.md:489",
+   "claim": "Design doc still documents Judgment.decisions as statistic-keyed; production+tests rekeyed to verdict_id. No runtime consumer still assumes statistic keys (examples/harness use VerdictRecord.decisions by trial_id).",
+   "evidence": "Repo scan: only docs/design/court-kernel-spec.md:489 matches statistic-keyed Judgment type comment; judge() live keys {'v-000001','v-000002'} with set(decisions)==set(verdict_ids)."
+  }
+ ],
+ "slice_verdicts": {
+  "A": "ACCEPT-WITH-FINDINGS",
+  "B": "ACCEPT-WITH-FINDINGS",
+  "C": "ACCEPT-WITH-FINDINGS",
+  "D": "ACCEPT",
+  "E": "ACCEPT",
+  "F": "ACCEPT",
+  "G": "ACCEPT",
+  "H": "ACCEPT"
+ },
+ "subject_commit": "610f9f8272c73e50d802a4012819c5e96a95a3db"
+}

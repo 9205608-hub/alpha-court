@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "alpha-court worker receipt v1",
+  "description": "Structured delivery receipt a worker agent must emit as its final output. Facts only: the receipt reports what was done and what was run; it never grades its own quality. The commander-side referee reviews the diff and re-runs checks independently.",
+  "type": "object",
+  "required": [
+    "ticket_id",
+    "status",
+    "summary",
+    "branch",
+    "commit",
+    "worktree_path",
+    "files_changed",
+    "self_test",
+    "deviations",
+    "open_questions"
+  ],
+  "properties": {
+    "ticket_id": {
+      "type": "string",
+      "description": "Ticket id exactly as given in the ticket header, e.g. 'v0.1-02'"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["done", "partial", "blocked", "failed"],
+      "description": "done = all acceptance criteria attempted and passing locally; partial = some done, see deviations; blocked = could not proceed, see open_questions; failed = attempted but not working"
+    },
+    "summary": {
+      "type": "string",
+      "description": "3-6 factual sentences: what was built/changed and how it is structured. No self-praise, no quality claims."
+    },
+    "branch": {
+      "type": "string",
+      "description": "Git branch the work was committed to (output of `git branch --show-current`)"
+    },
+    "commit": {
+      "type": "string",
+      "description": "HEAD commit hash after the final commit (output of `git rev-parse HEAD`)"
+    },
+    "worktree_path": {
+      "type": "string",
+      "description": "Absolute path of the working directory the work happened in (output of `pwd`)"
+    },
+    "files_changed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "action", "purpose"],
+        "properties": {
+          "path": { "type": "string" },
+          "action": { "type": "string", "enum": ["added", "modified", "deleted"] },
+          "purpose": { "type": "string", "description": "One line: why this file changed" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "self_test": {
+      "type": "array",
+      "description": "Every verification command actually executed, with its real exit code. Report failures honestly - a receipt with a failing self_test and status=partial is acceptable; a receipt that hides a failure is a contract violation.",
+      "items": {
+        "type": "object",
+        "required": ["cmd", "exit_code"],
+        "properties": {
+          "cmd": { "type": "string" },
+          "exit_code": { "type": "integer" },
+          "output_tail": { "type": "string", "description": "Last ~10 lines of output, verbatim" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "deviations": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Every place the delivered work deviates from the ticket text, each with the reason. Empty array if none."
+    },
+    "open_questions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Decisions the ticket did not cover that the worker had to guess at, or questions for the commander. Empty array if none."
+    },
+    "notes_for_referee": {
+      "type": "string",
+      "description": "Optional: anything the reviewer should look at first"
+    }
+  },
+  "additionalProperties": false
+}

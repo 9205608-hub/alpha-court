@@ -1,0 +1,64 @@
+{
+  "ticket_id": "v0.2-13",
+  "status": "partial",
+  "summary": "Vectorized the IC full-support fast path in adapters/qlib_cn._shared_kernel via new _masked_row_pearson (joint-mean center, zero non-joint, full-width dots). Slow-path dates still use the original _ranks_within_joint + _pearson loop. Added tests/test_adapter_kernel_perf.py with a frozen reference double-loop oracle (rtol=1e-12) and a dense T=480×N=336×199-offset perf budget. evaluate/evaluate_shifted routing unchanged; returns branch untouched.",
+  "branch": "dispatch/v02-13-kernel-perf-20260717-214417",
+  "commit": "25f6d508e1d7474ddd969d559142dad66ccf0fd9",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v02-13-kernel-perf-20260717-214417",
+  "files_changed": [
+    {
+      "path": "adapters/qlib_cn.py",
+      "action": "modified",
+      "purpose": "Add _masked_row_pearson and vectorize IC fast-path dates in _shared_kernel; keep slow-path re-rank loop"
+    },
+    {
+      "path": "tests/test_adapter_kernel_perf.py",
+      "action": "added",
+      "purpose": "Frozen-reference numeric equivalence battery + evaluate_shifted(199) <3s perf gate"
+    }
+  ],
+  "self_test": [
+    {
+      "cmd": "python3 -m venv .venv && .venv/bin/python -m pip install -e \".[dev]\"",
+      "exit_code": 0,
+      "output_tail": "Successfully installed alpha-court-0.1.0.dev0 iniconfig-2.3.0 numpy-2.5.1 packaging-26.2 pandas-3.0.3 pluggy-1.6.0 pygments-2.20.0 pytest-9.1.1 python-dateutil-2.9.0.post0 ruff-0.15.22 scipy-1.18.0 six-1.17.0"
+    },
+    {
+      "cmd": "TDD red: break _masked_row_pearson (+1.0) then .venv/bin/python -m pytest tests/test_adapter_kernel_perf.py::test_shared_kernel_ic_matches_reference -v --tb=line",
+      "exit_code": 1,
+      "output_tail": "FAILED tests/test_adapter_kernel_perf.py::test_shared_kernel_ic_matches_reference[dense]\nFAILED tests/test_adapter_kernel_perf.py::test_shared_kernel_ic_matches_reference[tie_heavy]\n========================= 2 failed, 3 passed in 0.49s =========================="
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest tests/test_adapter_qlib_cn.py tests/test_adapter_labels.py tests/test_adapter_kernel_perf.py -v",
+      "exit_code": 0,
+      "output_tail": "tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_dense_panel_under_3s PASSED\n========================= 8 passed, 1 skipped in 0.82s ========================="
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest",
+      "exit_code": 1,
+      "output_tail": "FAILED tests/test_killer_demo.py::test_report_smoke_four_sections_and_caption - ModuleNotFoundError: No module named 'matplotlib'\n============= 5 failed, 500 passed, 2 skipped in 516.61s (0:08:36) ============="
+    },
+    {
+      "cmd": ".venv/bin/ruff check .",
+      "exit_code": 0,
+      "output_tail": "All checks passed!"
+    },
+    {
+      "cmd": "timed evaluate_shifted(ic, range(199)) on dense (T=480,N=336) after vectorization",
+      "exit_code": 0,
+      "output_tail": "elapsed 0.47583649994339794"
+    },
+    {
+      "cmd": "git diff --stat 7ef5f03fbcc0cb42a43c2554f528c24e7080705d..HEAD",
+      "exit_code": 0,
+      "output_tail": " adapters/qlib_cn.py               | 100 ++++++++++++----\n tests/test_adapter_kernel_perf.py | 232 ++++++++++++++++++++++++++++++++++++++\n 2 files changed, 309 insertions(+), 23 deletions(-)"
+    }
+  ],
+  "deviations": [
+    "AC-4 full `pytest` exits 1 under AC-1 env (`pip install -e \".[dev]\"` only): 5 tests in tests/test_killer_demo.py fail with ModuleNotFoundError: matplotlib. matplotlib is the [demo] extra, not [dev]. Pre-existing env gap, not introduced by this change (court/harness/adapter tests: 500 passed; --ignore=tests/test_killer_demo.py → 488 passed). Ownership forbids touching killer_demo tests.",
+    "Did not modify tests/test_adapter_qlib_cn.py (allowed but unused); all new coverage lives in tests/test_adapter_kernel_perf.py.",
+    "returns branch left as the original Python loop (out of required scope; IC is the sweep bottleneck)."
+  ],
+  "open_questions": [],
+  "notes_for_referee": "Primary load-bearing check: test_shared_kernel_ic_matches_reference[*] vs pasted _reference_kernel_ic at rtol=1e-12. Dense-panel max abs/rel diff vs reference was 0.0 on a (480,336) battery. Measured evaluate_shifted(199) ≈ 0.48s (budget 3.0s; pre-opt baseline on this host ≈ 1.79s). Oracle qlib tests skipped without qlib (module-level importorskip in test_adapter_qlib_cn.py)."
+}

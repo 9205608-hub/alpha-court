@@ -1,0 +1,49 @@
+{
+  "ticket_id": "v0.3-00-rework-01",
+  "status": "done",
+  "branch": "dispatch/v0.3-00-blade-plumbing-20260813-153647",
+  "commit": "af67e385ffda6f995c0e05a2c0a4b9d06b996adf",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v0.3-00-blade-plumbing-20260813-153647",
+  "summary": "R1–R7 hardening: JSON-boundary pre-check makes blade_report appends all-or-nothing; protocol/duplicate-name checks at attach; empty roster is no roster; screened trials refuse re-evaluate; calibration is unique and blade_reports carry calibration_id; two-phase semantics documented and unflagged reports asserted.",
+  "files": [
+    "harness/blades.py",
+    "harness/run.py",
+    "tests/test_blades_harness.py"
+  ],
+  "commands": [
+    {
+      "command": "python3 -m pytest tests/test_blades_harness.py::test_np_int64_in_statistics_raises_with_zero_reports_then_retry_is_clean tests/test_blades_harness.py::test_nan_in_statistics_raises_with_zero_reports_on_chain -v",
+      "exit_code": 1,
+      "summary": "TDD red (R1): 2 failed — append_declaration ValueError on np.int64/NaN before CertificationError wrap and pre-check"
+    },
+    {
+      "command": "python3 -m pytest tests/test_blades_harness.py -v",
+      "exit_code": 0,
+      "summary": "19 passed"
+    },
+    {
+      "command": "python3 -m pytest -q",
+      "exit_code": 1,
+      "summary": "3 failed, 578 passed, 2 skipped — failures are the three named wall-clock perf tests"
+    },
+    {
+      "command": "python3 -m pytest tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_dense_panel_under_3s tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_churn_panel_under_5s tests/test_sharpe_perf.py::test_pbo_via_judge_completes_under_five_seconds -v",
+      "exit_code": 1,
+      "summary": "isolated re-run: dense 7.979s (budget 3.0s); churn 12.553s (budget 5.0s); PBO 22.899s (budget 5.0s)"
+    },
+    {
+      "command": "ruff check .",
+      "exit_code": 0,
+      "summary": "All checks passed"
+    },
+    {
+      "command": "git diff --stat f9297ebf..HEAD",
+      "exit_code": 0,
+      "summary": "harness/blades.py, harness/run.py, tests/test_blades_harness.py only"
+    }
+  ],
+  "deviations": [
+    "python3 -m pytest -q exited 1 solely on the three documented wall-clock perf tests (test_adapter_kernel_perf.py ×2, test_sharpe_perf.py ×1). Isolated re-run also failed. Blade-harness 19/19 and ruff are clean; ownership vs f9297ebf is the three allowed files."
+  ],
+  "open_questions": []
+}

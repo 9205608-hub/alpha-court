@@ -1,0 +1,10 @@
+{
+  "purpose": "beta_t appendix-only re-run (rework-02, quarantine lift)",
+  "r": 40,
+  "targets": [
+    4.0,
+    3.0
+  ],
+  "calibration": ".scratch/v0.2/power-frozen/calibration.json",
+  "match_beta_grid": "relative [b/2, 4b] (rework-02 FIX-B default)"
+}

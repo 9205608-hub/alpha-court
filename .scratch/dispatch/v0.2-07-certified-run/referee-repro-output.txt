@@ -1,0 +1,7 @@
+=== F-1: mid-battery brick revived via open() ===
+  judge raised: ValueError — bricked in-memory
+  in-memory seal blocked: ValueError
+  REOPEN seal SUCCEEDED sid=s-000001, verify PASS -> FAIL-OPEN CONFIRMED (n_verdicts=1)
+=== Finding A: anchor silently disabled by deleting manifest ===
+  honest verify(anchor) PASS, head=0e72ae5e7a88
+  after DELETING manifest, verify(anchor=real) STILL PASS -> Finding A CONFIRMED (anchor not consulted)

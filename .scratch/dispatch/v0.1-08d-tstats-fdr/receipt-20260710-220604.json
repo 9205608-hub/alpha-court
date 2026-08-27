@@ -1,0 +1,70 @@
+{
+  "ticket_id": "v0.1-08d",
+  "status": "done",
+  "summary": "Implemented court/tstats.py (TStatResult, t_stat with iid and Newey-West SE, p_from_t via standard normal asymptotics) and court/fdr.py (FdrResult, harmonic_number ascending float64 sum, fdr_bh and fdr_by step-up procedures with adjusted p-values). Tests written first from spec §5.4 vectors and bhy.md §6 N=10 fixture, then implementation to green. Pure functions only; no ledger/I/O/cross-court imports; no BHY string in code.",
+  "branch": "dispatch/v01-08d-tstats-fdr-20260710-220604",
+  "commit": "5454784371e9263446decc4bb525350f7c5f39e0",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v01-08d-tstats-fdr-20260710-220604",
+  "files_changed": [
+    {
+      "path": "court/tstats.py",
+      "action": "added",
+      "purpose": "t_stat (iid/Newey-West) and p_from_t pure functions per spec §5.4"
+    },
+    {
+      "path": "court/fdr.py",
+      "action": "added",
+      "purpose": "harmonic_number, fdr_bh, fdr_by step-up FDR with adjusted p-values per spec §5.5"
+    },
+    {
+      "path": "tests/test_tstats.py",
+      "action": "added",
+      "purpose": "Hand-worked t/p anchors and fail-closed guards from §5.4"
+    },
+    {
+      "path": "tests/test_fdr.py",
+      "action": "added",
+      "purpose": "bhy.md §6 N=10 BH/BY fixture, step-up canary, adjusted-p properties, empty/guards"
+    }
+  ],
+  "self_test": [
+    {
+      "cmd": "python3 -m venv .venv && .venv/bin/python -m pip install -e \".[dev]\"",
+      "exit_code": 0,
+      "output_tail": "Successfully installed alpha-court-0.1.0.dev0 iniconfig-2.3.0 numpy-2.5.1 packaging-26.2 pandas-3.0.3 pluggy-1.6.0 pygments-2.20.0 pytest-9.1.1 python-dateutil-2.9.0.post0 ruff-0.15.21 scipy-1.18.0 six-1.17.0"
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest tests/test_tstats.py tests/test_fdr.py -v",
+      "exit_code": 0,
+      "output_tail": "tests/test_fdr.py::test_fdr_raises_bad_q PASSED [100%]\n============================= 25 passed in 0.80s =============================="
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest",
+      "exit_code": 0,
+      "output_tail": "........................... [100%]\n27 passed in 0.62s"
+    },
+    {
+      "cmd": ".venv/bin/ruff check .",
+      "exit_code": 0,
+      "output_tail": "All checks passed!"
+    },
+    {
+      "cmd": ".venv/bin/python -c \"from court.fdr import fdr_by, harmonic_number; assert harmonic_number(10) == 2.9289682539682538; p = [0.0400, 0.0008, 0.0280, 0.0900, 0.0050, 0.0260, 0.0100, 0.0450, 0.0030, 0.0280]; r = fdr_by(p, 0.05); assert r.k_star == 3 and [i for i, x in enumerate(r.reject) if x] == [1, 4, 8], r\"",
+      "exit_code": 0,
+      "output_tail": "snippet ok"
+    },
+    {
+      "cmd": "git show --stat HEAD",
+      "exit_code": 0,
+      "output_tail": "court/fdr.py | 209 +++++\ncourt/tstats.py | 171 +++++\ntests/test_fdr.py | 143 +++++\ntests/test_tstats.py | 126 +++++\n4 files changed, 649 insertions(+)"
+    },
+    {
+      "cmd": "git status --porcelain",
+      "exit_code": 0,
+      "output_tail": ""
+    }
+  ],
+  "deviations": [],
+  "open_questions": [],
+  "notes_for_referee": "TDD: tests/test_tstats.py and tests/test_fdr.py were written and collected as ImportError (red) before court/tstats.py and court/fdr.py existed; then implemented to green. Adjusted p uses backward min recurrence with scale N*c_factor so adjusted_p[i]<=q iff reject[i] holds for both BH and BY. Local alpha_court.egg-info from pip install -e was removed (not committed) to satisfy empty porcelain."
+}

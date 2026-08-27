@@ -1,0 +1,70 @@
+{
+  "ticket_id": "v0.1-08b",
+  "status": "done",
+  "summary": "Implemented court/sharpe.py (SeriesMoments, series_moments, sharpe_ratio, sr_var_factor, sr_standard_error, psr, annualized_sr) and court/dsr.py (EULER_MASCHERONI, DsrResult, implied_independent_trials, avg_pairwise_correlation, rho_is_ill_conditioned, expected_max_sr, dsr). Literature-vector tests in tests/test_sharpe.py and tests/test_dsr.py cover dsr.md §4.1–§4.5 anchors, Normal var_factor identity, implied-N limits, and fail-closed guards. TDD: tests written and confirmed red (ImportError) before implementation.",
+  "branch": "dispatch/v01-08b-sharpe-dsr-20260710-220550",
+  "commit": "05373c6c1704a8d6a0304715e60df1bb4ac6ecc3",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v01-08b-sharpe-dsr-20260710-220550",
+  "files_changed": [
+    {
+      "path": "court/sharpe.py",
+      "action": "added",
+      "purpose": "SR estimator, moments, SE, PSR, display-only annualization per spec §5.1"
+    },
+    {
+      "path": "court/dsr.py",
+      "action": "added",
+      "purpose": "E[max SR], ρ̂/N̂, DSR per spec §5.2; imports court.sharpe only"
+    },
+    {
+      "path": "tests/test_sharpe.py",
+      "action": "added",
+      "purpose": "dsr.md §4.1–§4.2 vectors, Normal identity, and sharpe fail-closed guards"
+    },
+    {
+      "path": "tests/test_dsr.py",
+      "action": "added",
+      "purpose": "dsr.md §4.3–§4.5 vectors, implied-N limits, ρ̂ helpers, and dsr fail-closed guards"
+    }
+  ],
+  "self_test": [
+    {
+      "cmd": "python3 -m venv .venv && .venv/bin/python -m pip install -e \".[dev]\"",
+      "exit_code": 0,
+      "output_tail": "Successfully installed alpha-court-0.1.0.dev0 ... pytest-9.1.1 ... ruff-0.15.21 scipy-1.18.0"
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest tests/test_sharpe.py tests/test_dsr.py -v",
+      "exit_code": 0,
+      "output_tail": "============================== 26 passed in 0.75s =============================="
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest",
+      "exit_code": 0,
+      "output_tail": "============================== 28 passed in 0.63s =============================="
+    },
+    {
+      "cmd": ".venv/bin/ruff check .",
+      "exit_code": 0,
+      "output_tail": "All checks passed!"
+    },
+    {
+      "cmd": ".venv/bin/python -c \"from court.dsr import expected_max_sr; v = expected_max_sr(0.0, 0.5, 10.0); assert abs(v - 0.78729915067) < 1e-9, v\"",
+      "exit_code": 0,
+      "output_tail": ""
+    },
+    {
+      "cmd": "git show --stat HEAD",
+      "exit_code": 0,
+      "output_tail": "court/dsr.py | 218 +\n court/sharpe.py | 205 +\n tests/test_dsr.py | 214 +\n tests/test_sharpe.py | 158 +\n 4 files changed, 795 insertions(+)"
+    },
+    {
+      "cmd": "git status --porcelain",
+      "exit_code": 0,
+      "output_tail": ""
+    }
+  ],
+  "deviations": [],
+  "open_questions": [],
+  "notes_for_referee": "TDD contractual order was followed: tests/test_sharpe.py and tests/test_dsr.py were written first; collection failed with ModuleNotFoundError for court.sharpe/court.dsr before implementation; then both modules were implemented to green. expected_max_sr docstring states the 2014 Eq. (1) EVT approximation is conditioned on N ≫ 1. Negative ρ̂ extrapolation and rho_is_ill_conditioned disclosure match rulings C7–C8."
+}

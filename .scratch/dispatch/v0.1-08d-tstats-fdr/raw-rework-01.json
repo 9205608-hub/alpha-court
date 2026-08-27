@@ -1,0 +1,67 @@
+{
+  "text": "{ \"ticket_id\": \"v0.1-08d\", \"status\": \"partial\", \"summary\": \"Applying six referee rulings to the four owned files.\", \"branch\": \"\", \"commit\": \"\", \"worktree_path\": \"\", \"files_changed\": [], \"self_test\": [], \"deviations\": [], \"open_questions\": [], \"notes_for_referee\": \"Rework pass.\" }{ \"ticket_id\": \"v0.1-08d\", \"status\": \"partial\", \"summary\": \"Running suite, ruff, and committing referee fixes.\", \"branch\": \"\", \"commit\": \"\", \"worktree_path\": \"\", \"files_changed\": [], \"self_test\": [], \"deviations\": [], \"open_questions\": [], \"notes_for_referee\": \"Verify green then commit.\" }{\n  \"ticket_id\": \"v0.1-08d\",\n  \"status\": \"done\",\n  \"summary\": \"Addressed six referee findings without changing k*/rejection semantics: BY adjusted-p base case comment now cites the bhy.md §3.2 erratum and amended ruling E6; tstats module docstring cites HLZ §3.4 opening / §3.5 fn 26 and bhy.md §4.1–§4.3; _as_p_vector raises on 0-d scalar (no N=1 coercion) with a new guard test; adjusted-p monotonicity uses strict >=; empty BY c_factor=1.0 documented as N=0 sentinel on FdrResult and fdr_by; iid t hand-vector re-pinned to exact float64 pipeline value 3.464101615137754.\",\n  \"branch\": \"dispatch/v01-08d-tstats-fdr-20260710-220604\",\n  \"commit\": \"256096dd0845ef68e9d13bc39cf815d0ef9eef32\",\n  \"worktree_path\": \"[HOME]/.alpha-court/dispatch-worktrees/v01-08d-tstats-fdr-20260710-220604\",\n  \"files_changed\": [\n    {\n      \"path\": \"court/fdr.py\",\n      \"action\": \"modified\",\n      \"purpose\": \"E6 base-case citation, N=0 c_factor docs, raise on 0-d p_values\"\n    },\n    {\n      \"path\": \"court/tstats.py\",\n      \"action\": \"modified\",\n      \"purpose\": \"Correct HLZ/bhy pinpoints in module docstring\"\n    },\n    {\n      \"path\": \"tests/test_fdr.py\",\n      \"action\": \"modified\",\n      \"purpose\": \"Strict monotonicity assert; scalar p-value raise test\"\n    },\n    {\n      \"path\": \"tests/test_tstats.py\",\n      \"action\": \"modified\",\n      \"purpose\": \"Re-pin iid t to exact pipeline float 3.464101615137754\"\n    }\n  ],\n  \"self_test\": [\n    {\n      \"cmd\": \".venv/bin/python -m pytest tests/test_tstats.py tests/test_fdr.py -v\",\n      \"exit_code\": 0,\n      \"output_tail\": \"tests/test_fdr.py::test_fdr_raises_scalar_p PASSED [100%]\\n============================== 26 passed in 0.90s ==============================\"\n    },\n    {\n      \"cmd\": \".venv/bin/python -m pytest\",\n      \"exit_code\": 0,\n      \"output_tail\": \"............................ [100%]\\n28 passed in 0.66s\"\n    },\n    {\n      \"cmd\": \".venv/bin/ruff check .\",\n      \"exit_code\": 0,\n      \"output_tail\": \"All checks passed!\"\n    },\n    {\n      \"cmd\": \"git show --stat HEAD\",\n      \"exit_code\": 0,\n      \"output_tail\": \"court/fdr.py | 27 +++\\ncourt/tstats.py | 4\\ntests/test_fdr.py | 14\\ntests/test_tstats.py | 14\\n4 files changed, 41 insertions(+), 18 deletions(-)\"\n    },\n    {\n      \"cmd\": \"git status --porcelain\",\n      \"exit_code\": 0,\n      \"output_tail\": \"\"\n    }\n  ],\n  \"deviations\": [],\n  \"open_questions\": [],\n  \"notes_for_referee\": \"Behavior of k*, reject sets, and BY base case min(1, c(N)*P_(N)) unchanged; paperwork and four minors only. Commit message: v0.1-08d: address referee findings.\"\n}",
+  "stopReason": "EndTurn",
+  "sessionId": "019f4c59-99fc-7580-82ca-64de1fde2866",
+  "requestId": "6ac1c5b9-ee25-4fb0-80fe-83b338c5d8c6",
+  "thought": "The user wants me to address referee findings on the tstats and fdr modules. Let me make the required changes carefully:\nI'll apply all six changes now.Also need to update fdr_bh Raises to mention scalar? Not required. And check if math import is still needed in test_tstats.py for newey west test.All green. Commit with the specified message and produce receipt.Final JSON receipt only.",
+  "structuredOutput": {
+    "ticket_id": "v0.1-08d",
+    "status": "done",
+    "summary": "Addressed six referee findings without changing k*/rejection semantics: BY adjusted-p base case comment now cites the bhy.md §3.2 erratum and amended ruling E6; tstats module docstring cites HLZ §3.4 opening / §3.5 fn 26 and bhy.md §4.1–§4.3; _as_p_vector raises on 0-d scalar (no N=1 coercion) with a new guard test; adjusted-p monotonicity uses strict >=; empty BY c_factor=1.0 documented as N=0 sentinel on FdrResult and fdr_by; iid t hand-vector re-pinned to exact float64 pipeline value 3.464101615137754.",
+    "branch": "dispatch/v01-08d-tstats-fdr-20260710-220604",
+    "commit": "256096dd0845ef68e9d13bc39cf815d0ef9eef32",
+    "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v01-08d-tstats-fdr-20260710-220604",
+    "files_changed": [
+      {
+        "path": "court/fdr.py",
+        "action": "modified",
+        "purpose": "E6 base-case citation, N=0 c_factor docs, raise on 0-d p_values"
+      },
+      {
+        "path": "court/tstats.py",
+        "action": "modified",
+        "purpose": "Correct HLZ/bhy pinpoints in module docstring"
+      },
+      {
+        "path": "tests/test_fdr.py",
+        "action": "modified",
+        "purpose": "Strict monotonicity assert; scalar p-value raise test"
+      },
+      {
+        "path": "tests/test_tstats.py",
+        "action": "modified",
+        "purpose": "Re-pin iid t to exact pipeline float 3.464101615137754"
+      }
+    ],
+    "self_test": [
+      {
+        "cmd": ".venv/bin/python -m pytest tests/test_tstats.py tests/test_fdr.py -v",
+        "exit_code": 0,
+        "output_tail": "tests/test_fdr.py::test_fdr_raises_scalar_p PASSED [100%]\n============================== 26 passed in 0.90s =============================="
+      },
+      {
+        "cmd": ".venv/bin/python -m pytest",
+        "exit_code": 0,
+        "output_tail": "............................ [100%]\n28 passed in 0.66s"
+      },
+      {
+        "cmd": ".venv/bin/ruff check .",
+        "exit_code": 0,
+        "output_tail": "All checks passed!"
+      },
+      {
+        "cmd": "git show --stat HEAD",
+        "exit_code": 0,
+        "output_tail": "court/fdr.py | 27 +++\ncourt/tstats.py | 4\ntests/test_fdr.py | 14\ntests/test_tstats.py | 14\n4 files changed, 41 insertions(+), 18 deletions(-)"
+      },
+      {
+        "cmd": "git status --porcelain",
+        "exit_code": 0,
+        "output_tail": ""
+      }
+    ],
+    "deviations": [],
+    "open_questions": [],
+    "notes_for_referee": "Behavior of k*, reject sets, and BY base case min(1, c(N)*P_(N)) unchanged; paperwork and four minors only. Commit message: v0.1-08d: address referee findings."
+  }
+}

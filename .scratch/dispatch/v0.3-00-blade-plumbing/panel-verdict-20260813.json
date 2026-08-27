@@ -1,0 +1,178 @@
+{
+  "summary": "Adversarial 3-lens panel on ticket v0.3-00 delivery (blade plumbing)",
+  "agentCount": 3,
+  "logs": [],
+  "result": {
+    "screen": {
+      "findings": [
+        {
+          "severity": "major",
+          "claim": "The screen is attachment-conditional and non-sticky: a screened trial DOES leak into derived scope, judgment, and a passing seal+verify. Three demonstrated paths: (a) CertifiedRun.open(path, evaluator) with default blades=None re-attaches to the ledger and evaluate(tid_b) records the previously-screened trial — it enters judge scope, seals, and verify() PASSES while the flagged on_flag:screen blade_report is still on chain; (b) create() without blades silently records a trial whose spec declares on_flag:screen (no error, no report, no trace); (c) a stateful/pool-dependent blade (pool_redundancy in ticket 1 is inherently pool-dependent) that flags on first call and not on retry lets a caller re-roll evaluate() until the screen lifts — trial records, enters scope, verify passes with the contradictory [flagged=True, flagged=False] report sequence on chain. Root cause: run_config and policy are pinned on chain and cross-checked at open(), but blade attachment is not pinned anywhere — no declaration records the blade roster, and open()/evaluate() never cross-check spec screen declarations against attached blades. ATTRIBUTION: code matches the frozen ticket (blades keyword optional, default byte-identical to base), so this is a design-level gap the delivery faithfully implements, not a worker deviation — but the delivery claim 'it never enters derived scope or judgment' is only true while the same deterministic blades stay attached, and nothing enforces that. Recommend a follow-up ruling: pin the attached-blade roster in a declaration (analogous to run_config) or document this as honest boundary #5 in run.py's module docstring.",
+          "evidence": "harness/run.py:400-405 — screening gated solely on `if self._blades is not None`; harness/run.py:272-338 — open() takes blades=None default and performs no on-chain cross-check of blade attachment (contrast run.py:303-307 which DOES fail-closed on missing run_config/policy); harness/run.py:100-113 — spec on_flag is only ever read inside _apply_blades, so a blade-less run never sees the screen declaration. Probes P3/P3b/P9 in probe_lens1.py + probe_lens1b.py.",
+          "probe_output": "P3: after screen: status B = registered | after blade-less open+evaluate: status B = evaluated | judge scope includes B: True | seal+verify PASS with flagged screen report AND evaluation on chain: 1 verdicts, 2 trials. P3b: status: evaluated (spec screen declaration ignored, no error, no report). P9: status B: evaluated | verify passes; flagged sequence on chain: [True, False]."
+        },
+        {
+          "severity": "major",
+          "claim": "A blade report that passes validate_blade_report but is not JSON-serializable (np.int64/np.bool_ inside statistics/evidence, or NaN — ledger uses allow_nan=False) escapes evaluate() as a raw ValueError instead of CertificationError, and leaves a PARTIAL blade pass on chain: earlier blades' reports are already appended, the failing blade executed but left no report, no screen decision was reached, and the evaluation is not recorded. This violates ticket clause 2.d (report validation failure → CertificationError), breaks the '砍必留痕: EVERY executed blade leaves a report on chain' atomicity, and misclassifies the failure under run.py's own error taxonomy (run.py:61-67: ValueError = caller error, CertificationError = protocol failure — a blade emitting a non-serializable report is a blade-protocol failure). The trigger is realistic, not contrived: tickets 1-3 blades compute numpy statistics, and np.int64 counts / np.bool_ comparisons / NaN correlations are exactly what they will emit (np.float64 happens to survive as a float subclass; np.int64 and np.bool_ do not). Fail-closed on the evaluation itself (trial stays registered, no certification invariant broken), but the exception class and partial declaration state are contract violations. Fix: extend validate_blade_report (or the _apply_blades wrapper) with a json.dumps(report, allow_nan=False) pre-check before ANY append.",
+          "evidence": "harness/run.py:451-458 — reports appended one-by-one in a loop with no serializability pre-check and no try/except around ledger.append_declaration; harness/blades.py:33-56 — validate_blade_report checks key presence/types only, never serializability; court/ledger.py:868-886 + court/ledger.py:153-158 — append_declaration raises bare ValueError('declaration payload is not JSON-serializable...') with allow_nan=False. Probe P5 (second case) in probe_lens1.py.",
+          "probe_output": "np.int64 in report stats -> ValueError : declaration payload is not JSON-serializable: Object of type int64 is not JSON serializable | status: registered | blade_reports already on chain: 1 (partial: good's report appended, npint's lost). Contrast np.bool_ in the flagged field itself -> CertificationError | reports on chain: 0 (that path IS fail-closed correctly)."
+        },
+        {
+          "severity": "minor",
+          "claim": "evaluate() on an already-screened trial is unguarded and re-runs the full pipeline each call: the evaluator re-executes and every attached blade appends a fresh duplicate blade_report declaration (1 report after first call, 3 after three calls), including AFTER the judgment declaration is on chain (post-judge re-evaluate of a screened trial appends reports behind the judgment event; verify still passes since declarations are opaque). No idempotence/no-op guard, no contract stance in the ticket. Consequence: chain noise, wasted evaluator runs, and a double-counting hazard for the ticket-4 null-museum consumer, which must dedupe blade_reports per (trial_id, blade) rather than trusting one-report-per-executed-screen.",
+          "evidence": "harness/run.py:376-405 — evaluate() has no check of prior screen outcome or judge state before re-running _apply_blades; harness/run.py:451-458 — unconditional append per call. Probes P2 and P7.",
+          "probe_output": "P2: reports for B after 1st/3rd evaluate: 1 / 3 | status B: registered | seal+verify still pass with duplicate reports. P7 (post-judge re-evaluate): status B: registered | reports for B: 2 | verify PASSES with blade_report AFTER judgment declaration."
+        },
+        {
+          "severity": "minor",
+          "claim": "append_blade_calibration enforces no uniqueness: a second, conflicting blade_calibration declaration can be appended mid-run with no error; find_blade_calibration silently returns the first, so the later one is a dead-letter that nonetheless sits on chain — audit-confusing given the design's 'thresholds frozen before any run, never silently re-tune' stance (design §3), and blade_report payloads carry no reference to the governing calibration declaration id. Within the ticket's letter (it specifies 'the FIRST declaration' read semantics and no uniqueness requirement), so a doc/robustness nit for ticket 3 to close.",
+          "evidence": "harness/blades.py:66-97 — append_blade_calibration validates inputs but never checks for an existing calibration; harness/blades.py:100-106 — find_blade_calibration returns first match; harness/run.py:452-458 — blade_report payload = {kind, trial_id, report} with no calibration linkage.",
+          "probe_output": ""
+        }
+      ],
+      "verdict": "findings"
+    },
+    "failclosed": {
+      "findings": [
+        {
+          "severity": "major",
+          "claim": "A schema-valid but non-JSON-serializable blade report (e.g. NaN in statistics — routine for correlation blades on degenerate series) escapes as raw ValueError instead of CertificationError, and in a multi-blade batch leaves a HALF-APPENDED chain: earlier blades' blade_report declarations are already persisted to disk when a later append fails; retrying evaluate() then writes DUPLICATE blade_reports permanently onto the append-only chain, invisible to seal/verify.",
+          "evidence": "harness/blades.py:33-56 validate_blade_report checks only isinstance(...) dict-ness, never JSON serializability; harness/run.py:432-448 validates all reports, then harness/run.py:451-458 appends them one by one with no serializability pre-check — court/ledger.py:868-886 append_declaration raises ValueError('declaration payload is not JSON-serializable') per call (json.dumps allow_nan=False at court/ledger.py:153-158), which _apply_blades does not catch. This breaks the ticket's step-2c/2d fail-closed contract (blade-processing failure → CertificationError) and corrupts the 砍必留痕 evidence supply (duplicate/orphan reports) that ticket 4's null museum will consume. Not a blocker: verify() still passes (declarations are court-opaque) and no AC test covers it. Fix direction: JSON-boundary-check every report (all of them, before the first append) inside the wiring and wrap in CertificationError.",
+          "probe_output": "P3 single blade: 'statistics contains NaN: ESCAPED AS ValueError: declaration payload is not JSON-serializable: Out of range float values are not JSON compliant: nan'. P4 two blades [good, bad-NaN]: 'raised ValueError ... post-failure state={status: registered, n_blade_reports: 1}; blade_reports on chain: [(good, t-000001)]'; on-disk check: 'orphan blade_report lines persisted on disk after failure: 1'; after fixing bad blade and retrying: 'blade_reports=[good, good, bad] (n=3)'; then 'seal+verify PASSED on polluted chain: n_trials=1 n_verdicts=1; final blade_report count: 3 (expected 2 in a clean world)'."
+        },
+        {
+          "severity": "minor",
+          "claim": "A blade object missing the .name attribute raises raw AttributeError, not CertificationError (fail-closed direction is preserved: nothing appended, nothing recorded, trial stays registered).",
+          "evidence": "harness/run.py:428-429 — effects.append(_resolve_on_flag(spec, blade.name)) accesses blade.name with no guard; the module docstring (harness/blades.py:8-15) defines the structural protocol but the wiring converts every other protocol violation to CertificationError while this one leaks the bare exception type.",
+          "probe_output": "P8: 'ESCAPED AS AttributeError: NamelessBlade object has no attribute name  state={status: registered, n_blade_reports: 0, n_decls: 3}'."
+        },
+        {
+          "severity": "minor",
+          "claim": "The design invariant 'blade_calibration must be on chain BEFORE the first blade_report' (design §1.1/§3) is only enforced for harness-produced reports; a blade_report declaration appended directly via the public court-opaque Ledger.append_declaration before calibration is silently tolerated — evaluate() succeeds and verify() cannot detect the ordering violation.",
+          "evidence": "harness/run.py:421-424 checks only existence (find_blade_calibration is None), not that the calibration precedes all existing blade_report declarations; harness/blades.py:100-106 find_blade_calibration is a pure first-match scan. The ticket letter (task 2a: 'Fail closed if no blade_calibration declaration is on the chain yet') is satisfied, so this is a scope/doc gap versus the frozen design's ordering wording, not a contract breach — worth one docstring sentence or a cheap precedence check.",
+          "probe_output": "P6: 'evaluate SUCCEEDED with blade_report preceding calibration on chain: [run_config, aggregation_policy, blade_report, blade_calibration, blade_report]'."
+        },
+        {
+          "severity": "minor",
+          "claim": "Duplicate blade names in the attached sequence are accepted without guard: both same-name blades run, both leave same-name reports on chain, and a single spec entry governs both effects — ambiguous attribution for downstream consumers (null museum, per-blade thresholds/joint-FPR accounting keyed by blade name).",
+          "evidence": "harness/run.py:428-448 iterates self._blades with no uniqueness check on blade.name; the calibration payload's thresholds dict (harness/blades.py:88-97) and the report schema are keyed by blade name, so name collisions are structurally meaningful yet unpoliced and undocumented. Ticket does not require uniqueness, hence minor.",
+          "probe_output": "P7: 'status=evaluated  reports=[(dummy, False), (dummy, True)]' — two reports with identical blade name for one trial."
+        },
+        {
+          "severity": "minor",
+          "claim": "blades=[] (empty sequence) is treated as ATTACHED, not as None: every evaluate() demands a blade_calibration declaration even though zero blades will ever run or report — an unspecified semantic the ticket never defines and the code/tests never document.",
+          "evidence": "harness/run.py:228 'self._blades = tuple(blades) if blades is not None else None' makes () pass the 'self._blades is not None' gate at harness/run.py:400. Direction is safe (fails loudly with CertificationError rather than silently skipping the calibration gate), so this is a doc gap only; one docstring line or a test pinning the choice would close it.",
+          "probe_output": "P9: 'no calibration: CertificationError (blades attached but no blade_calibration declaration on chain) -> [] treated as ATTACHED'; 'with calibration: status=evaluated  n_reports=0'."
+        }
+      ],
+      "verdict": "findings"
+    },
+    "fidelity": {
+      "verdict": "findings",
+      "findings": [
+        {
+          "severity": "minor",
+          "claim": "Two-phase report append deviates from ticket step (d)'s literal per-blade sequential text in the partial-failure path — RULING: improvement within contract ambiguity, not a violation; keep the delivery's semantics, but it is undocumented and untested.",
+          "evidence": "harness/run.py:431-449 runs+validates ALL blades collecting reports in memory, :451-458 then appends all, :460-463 then decides screen. Ticket step (d) (ticket.md:117-121) reads per-blade 'validate then append' and says 'EVERY executed blade leaves a report on chain'. Under the delivery, if blade 2 of N raises, blade 1's executed report never reaches the chain — a literal breach of that sentence. Adjudication: (1) ticket step (c) (ticket.md:114-116) says a blade raise means 'nothing recorded', which sequential per-blade appending would itself violate (blade 1's report already on chain in a failed pass); (2) step (e) (ticket.md:122-124, 'if ANY report has flagged==True') already mandates run-all-then-decide, so the two-phase shape is the more internally consistent reading; (3) material consequence favors the delivery: the ledger is append-only, so sequential semantics duplicate earlier blades' reports when evaluate() is retried after fixing the raising blade (probe P1b: delivery yields exactly 1 report per blade on retry), and duplicates would pollute the null-museum consumer (ticket 4); (4) blades are deterministic (design axiom A1), so the withheld report is exactly regenerated on retry — no permanent evidence loss; (5) success path incl. screen is identical to ticket text, preserving 砍必留痕. Residual defects: _apply_blades docstring (run.py:415-421) does not state the all-or-nothing atomicity choice, and no test in tests/test_blades_harness.py covers a mid-pass blade failure with an earlier successful blade.",
+          "probe_output": "P1 (blades=[b1_ok, boom_raises]): CertificationError: blade 'boom' raised: boom | b1 executed on: ['t-000001'] | blade_reports on chain after failure: [] | status: registered. P1b (retry after replacing boom with a working blade): n_reports=2, blades=['b1','b2'] (sequential semantics would have given 3 with b1 duplicated)."
+        },
+        {
+          "severity": "minor",
+          "claim": "AC2 (full suite exit 0) did not reproduce green on the referee machine — 3 failures — but all 3 are pre-existing wall-clock perf-budget tests in files the delivery never touched and fail identically at the BASE tree: attribution = environment, not worker; zero regressions attributable to the delivery.",
+          "evidence": "Failures: tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_dense_panel_under_3s, ::test_evaluate_shifted_ic_churn_panel_under_5s, tests/test_sharpe_perf.py::test_pbo_via_judge_completes_under_five_seconds — adapter-kernel and judge/PBO paths, untouched by the delivery (git diff 7d7bb46a..f9297ebf --name-only = harness/blades.py, harness/run.py, tests/test_blades_harness.py only). A/B: the same 3 tests fail at the base tree (git archive 7d7bb46a extraction) on the same machine, which currently carries persistent background CPU load (long-lived python3 process at ~26% CPU). Count reconciliation: delivery full suite 3 failed / 569 passed / 2 skipped = 574 collected = base 564 (562 passed + 2 skipped per commander's base verification) + exactly the 10 new tests. The commander should re-run AC2 on a quiet machine before certification.",
+          "probe_output": "Delivery worktree full suite: '3 failed, 569 passed, 2 skipped in 1703.00s' (run contaminated by referee's own concurrent probes); quiet re-run of the two perf files at delivery: '3 failed, 10 passed in 23.01s'; SAME files at base tree: '3 failed, 10 passed in 46.57s' — identical failure set at base. AC1 independently green: 'tests/test_blades_harness.py 10 passed in 6.23s', exit 0. AC3: 'ruff check . --no-cache' → 'All checks passed!', exit 0."
+        },
+        {
+          "severity": "minor",
+          "claim": "No test anywhere asserts that an UNFLAGGED executed blade leaves a report on chain — the 'flagged or not' half of ticket step (d)'s evidence-supply contract is implemented but unasserted.",
+          "evidence": "tests/test_blades_harness.py:241-245 (test 3a) computes all blade reports but filters to trial B only (flagged case); trial A is evaluated by the same blade with flagged=False and the code appends its report (harness/run.py:451-458 appends unconditionally before the flag decision), yet no assertion checks it. Test 3b's report is flagged=True. Not an AC violation — the ticket's enumerated tests 3a-3g do not literally demand it — but the contract sentence 'EVERY executed blade leaves a report on chain, flagged or not' has no direct test. One-line fix: in 3a assert a flagged=False report exists for tid_a (probe confirms it would pass today).",
+          "probe_output": "Probe reproducing 3a: total blade_reports=2 | trial=t-000001 flagged=False | trial=t-000002 flagged=True | status A=evaluated B=registered — the unflagged report IS on chain; only the assertion is missing."
+        },
+        {
+          "severity": "minor",
+          "claim": "TDD red-first (iron law 3 / AC4) cannot be verified from the receipt here — the receipt JSON is not present in the worktree or reachable dispatch dirs — but red-phase plausibility is POSITIVELY confirmed: the delivered test file fails wholesale against the base tree.",
+          "evidence": "Only ticket.md exists in .scratch/dispatch/v0.3-00-blade-plumbing/ inside the worktree; no receipt file found under [HOME]/.alpha-court or the main checkout's dispatch dir. Independent probe: extracted base tree 7d7bb46a via git archive (read-only), dropped in the delivered tests/test_blades_harness.py, ran pytest — all 10 tests fail (ModuleNotFoundError on harness.blades / TypeError on the blades kwarg), i.e. the claimed red phase is not merely plausible but inevitable for this test file at base. The commander, who holds the actual receipt, should confirm the recorded command + non-zero exit code matches.",
+          "probe_output": "Base-tree run of delivered test file: '10 failed in 15.05s' (pytest non-zero exit; my probe's trailing echo captured tail's exit, not pytest's)."
+        },
+        {
+          "severity": "minor",
+          "claim": "Edge unspecified by the ticket: blades=[] (empty roster, distinct from None) triggers the blade_calibration fail-closed gate even though zero blades would run.",
+          "evidence": "harness/run.py:226 stores tuple(blades) for any non-None sequence, so self._blades == () enters _apply_blades (run.py:400) and hits the calibration check (run.py:423) before discovering there is nothing to execute. The ticket pins only 'Default None → behavior byte-identical to today'; empty-sequence semantics are unspecified. Fail-closed is a defensible reading (an attached-but-empty roster without calibration erring loudly), so this is a note for the ticket-1 blade authors, not a defect demanding rework.",
+          "probe_output": "P2: create(blades=[]) then evaluate without calibration → CertificationError: blades attached but no blade_calibration declaration on chain."
+        }
+      ]
+    }
+  },
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Refute"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "refute:screen",
+      "phaseIndex": 1,
+      "phaseTitle": "Refute",
+      "agentId": "ad8ed8897f8be901d",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786607335166,
+      "queuedAt": 1786607335148,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "findings",
+      "promptPreview": "You are an adversarial verifier refereeing a worker delivery in the alpha-court repo.\nDelivery worktree (READ-ONLY — you must NOT modify, create, or delete ANY file inside it; git state must stay untouched): [HOME]/.alpha-court/dispatch-worktrees/v0.3-00-blade-plumbing-20260813-153647\nThe delivery is commit f9297ebf (diff vs parent 7d7bb46a), files: harness/blades.py (new), harness/run.py,…",
+      "lastProgressAt": 1786607891638,
+      "tokens": 108919,
+      "toolCalls": 16,
+      "durationMs": 556467,
+      "resultPreview": "{\"findings\":[{\"severity\":\"major\",\"claim\":\"The screen is attachment-conditional and non-sticky: a screened trial DOES leak into derived scope, judgment, and a passing seal+verify. Three demonstrated paths: (a) CertifiedRun.open(path, evaluator) with default blades=None re-attaches to the ledger and evaluate(tid_b) records the previously-screened trial — it enters judge scope, seals, and verify() PA…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "refute:failclosed",
+      "phaseIndex": 1,
+      "phaseTitle": "Refute",
+      "agentId": "a6b7d04b41f3859df",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786607335175,
+      "queuedAt": 1786607335148,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "findings",
+      "promptPreview": "You are an adversarial verifier refereeing a worker delivery in the alpha-court repo.\nDelivery worktree (READ-ONLY — you must NOT modify, create, or delete ANY file inside it; git state must stay untouched): [HOME]/.alpha-court/dispatch-worktrees/v0.3-00-blade-plumbing-20260813-153647\nThe delivery is commit f9297ebf (diff vs parent 7d7bb46a), files: harness/blades.py (new), harness/run.py,…",
+      "lastProgressAt": 1786607853340,
+      "tokens": 101537,
+      "toolCalls": 19,
+      "durationMs": 518164,
+      "resultPreview": "{\"findings\":[{\"severity\":\"major\",\"claim\":\"A schema-valid but non-JSON-serializable blade report (e.g. NaN in statistics — routine for correlation blades on degenerate series) escapes as raw ValueError instead of CertificationError, and in a multi-blade batch leaves a HALF-APPENDED chain: earlier blades' blade_report declarations are already persisted to disk when a later append fails; retrying eva…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "refute:fidelity",
+      "phaseIndex": 1,
+      "phaseTitle": "Refute",
+      "agentId": "ac07c242183562985",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786607335176,
+      "queuedAt": 1786607335148,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "findings",
+      "promptPreview": "You are an adversarial verifier refereeing a worker delivery in the alpha-court repo.\nDelivery worktree (READ-ONLY — you must NOT modify, create, or delete ANY file inside it; git state must stay untouched): [HOME]/.alpha-court/dispatch-worktrees/v0.3-00-blade-plumbing-20260813-153647\nThe delivery is commit f9297ebf (diff vs parent 7d7bb46a), files: harness/blades.py (new), harness/run.py,…",
+      "lastProgressAt": 1786609394067,
+      "tokens": 118677,
+      "toolCalls": 42,
+      "durationMs": 2058891,
+      "resultPreview": "{\"verdict\":\"findings\",\"findings\":[{\"severity\":\"minor\",\"claim\":\"Two-phase report append deviates from ticket step (d)'s literal per-blade sequential text in the partial-failure path — RULING: improvement within contract ambiguity, not a violation; keep the delivery's semantics, but it is undocumented and untested.\",\"evidence\":\"harness/run.py:431-449 runs+validates ALL blades collecting reports in m…"
+    }
+  ],
+  "totalTokens": 329133,
+  "totalToolCalls": 77
+}

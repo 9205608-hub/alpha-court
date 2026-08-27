@@ -1,0 +1,65 @@
+{
+  "ticket_id": "v0.1-08f",
+  "status": "done",
+  "summary": "Implemented court/judge.py as the thin orchestrator: Application/Judgment NamedTuples and judge(ledger, scope, config) applying fdr_by/fdr_bh, dsr, pbo_cscv, and noise_control under each trial's declared protocol, appending one VerdictRecord per application with engine_version from court.__version__. Decision polarity follows the §5.8 table (FDR rejection-set membership, DSR≥confidence, φ≤threshold, p̂≤alpha each map to court \"pass\"). Finalized court/__init__.py with __version__=\"0.1.0.dev0\" and public re-exports of ledger records, pure statistics, Application, Judgment, and judge. tests/test_judge.py covers FDR E2E, noise individual/pool_max, DSR and PBO both polarities, status→judged, fail-closed guards, and the public API surface (13 tests).",
+  "branch": "dispatch/v01-08f-judge-20260710-223952",
+  "commit": "cddfd1decf66d832675206970b640117d3daacc0",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v01-08f-judge-20260710-223952",
+  "files_changed": [
+    {
+      "path": "court/judge.py",
+      "action": "added",
+      "purpose": "Thin judge orchestrator: Application, Judgment, judge, polarity table, metric registry"
+    },
+    {
+      "path": "court/__init__.py",
+      "action": "modified",
+      "purpose": "Set __version__ and re-export public ledger/stats/judge API"
+    },
+    {
+      "path": "tests/test_judge.py",
+      "action": "added",
+      "purpose": "TDD coverage for applications, polarity, guards, status, and public imports"
+    }
+  ],
+  "self_test": [
+    {
+      "cmd": "python3 -m venv .venv && .venv/bin/python -m pip install -e \".[dev]\"",
+      "exit_code": 0,
+      "output_tail": "Successfully installed alpha-court-0.1.0.dev0 iniconfig-2.3.0 numpy-2.5.1 packaging-26.2 pandas-3.0.3 pluggy-1.6.0 pygments-2.20.0 pytest-9.1.1 python-dateutil-2.9.0.post0 ruff-0.15.21 scipy-1.18.0 six-1.17.0"
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest tests/test_judge.py -v",
+      "exit_code": 0,
+      "output_tail": "tests/test_judge.py::test_public_api_reexports PASSED [100%]\n============================== 13 passed in 0.96s =============================="
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest",
+      "exit_code": 0,
+      "output_tail": "tests/test_tstats.py .............. [100%]\n============================= 129 passed in 1.47s =============================="
+    },
+    {
+      "cmd": ".venv/bin/ruff check .",
+      "exit_code": 0,
+      "output_tail": "All checks passed!"
+    },
+    {
+      "cmd": ".venv/bin/python -c \"import court; assert court.__version__ == '0.1.0.dev0'; court.judge; court.Ledger; court.fdr_by; court.empirical_null_p\"",
+      "exit_code": 0,
+      "output_tail": ""
+    },
+    {
+      "cmd": "git show --stat HEAD",
+      "exit_code": 0,
+      "output_tail": " court/__init__.py   |  88 +++++++\n court/judge.py      | 440 +++++++++++++++++++++++++++++++++++\n tests/test_judge.py | 651 ++++++++++++++++++++++++++++++++++++++++++++++++++++\n 3 files changed, 1179 insertions(+)"
+    },
+    {
+      "cmd": "git status --porcelain",
+      "exit_code": 0,
+      "output_tail": ""
+    }
+  ],
+  "deviations": [],
+  "open_questions": [],
+  "notes_for_referee": "TDD: tests/test_judge.py written first; red phase confirmed with ModuleNotFoundError: No module named 'court.judge' before court/judge.py existed. Judged status derives only from decisions keys (ledger contract), so DSR/PBO leave non-selected scope members at evaluated. noise_control provenance keys are copied into verdict params only when present on the application; null_stats are recorded in both params and computed per §5.8."
+}

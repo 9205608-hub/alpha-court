@@ -1,0 +1,98 @@
+{
+  "grade": "B",
+  "verdict": "revise",
+  "cr08_nonperformative": {
+    "pytest_passed": true,
+    "naive_discriminative": true,
+    "any_red_test_green_on_naive": [
+      "test_staged_* (6) — call anti_pattern --staged directly, never exercise run-gates.sh; green on naive hooks is expected, not a false claim",
+      "test_hook_allows_acked_hardroll / test_hook_allows_skill_with_costaged_review — positive-path allows; green on naive (skill gate sees HEAD empty → 'no skill change' PASS) so they do not discriminate AND/write-tree wiring",
+      "test_hook_no_verify_is_a_declared_hole — intentionally green (documents hole)",
+      "test_hook_nonexecutable_is_caught_by_installer — installer-only"
+    ],
+    "notes": "Real impl: 35/35 pass after bash scripts/install-hooks.sh. Naive run-gates (worktree scan + skill on HEAD + exit $?) correctly turns RED the 5 hook claims that matter: test_hook_blocks_unacked_hardroll (anti_pattern FAIL then skill PASS → exit 0 swallow), test_hook_index_vs_worktree_blocks (clean worktree PASS), test_hook_fails_closed_when_gate_errors (crash swallowed), test_hook_blocks_unreviewed_skill + test_hook_skill_gate_uses_staged_tree_not_HEAD (HEAD misses staged skill). Not CR-08 theater for the index/AND/write-tree story. Soft gap: positive allow-tests and unit-level --staged tests do not police hook wiring."
+  },
+  "new_bypasses_found": [
+    {
+      "vector": "staged mode=120000 symlink named *.py — git show :path is the target path string, not file bytes; gate scans 'sub/real.py' text, no tokens, PASS. Pair with hardroll already under excluded path (tests/) or prior --no-verify commit.",
+      "commands_tried": "echo HARDROLL>tests/fixture_sharpe.py; git add+commit --no-verify; ln -sf ../tests/fixture_sharpe.py research/factor.py; git add research/factor.py; bash .githooks/run-gates.sh → rc=0; git commit -m symlink → success. Also alias.py → target_evil.py commit rc=0.",
+      "hook_result": "leaked",
+      "severity": "major",
+      "preventable": "yes",
+      "fix": "In scan_staged, if index mode is 120000 (or blob is a symlink), fail-closed or resolve and scan the target blob/path; red-test the second half of enum V17 (enum named symlink, red-test only covered rename/extensionless)."
+    },
+    {
+      "vector": "case-sensitive suffix filter path.suffix == '.py' only — staged mixed.Py / evil.PY with full hand-roll is not scanned",
+      "commands_tried": "printf HARDROLL > mixed.Py; git add mixed.Py; python -m harness.anti_pattern_gate --staged → PASS rc=0; git commit -m 'mixed Py' → success (probe6).",
+      "hook_result": "leaked",
+      "severity": "major",
+      "preventable": "yes",
+      "fix": "Use path.suffix.lower() == '.py' (and/or shebang sniff). Adjacent to V17 extension-blind; case fold was not red-tested."
+    },
+    {
+      "vector": "core.hooksPath=.githooks still set but .githooks/ absent on disk (rm -rf, sparse, or checkout predating hooks) — git silently skips hooks, fail-open",
+      "commands_tried": "bash scripts/install-hooks.sh; rm -rf .githooks; echo HARDROLL>evil.py; git add evil.py; git commit -m nohooks → success rc=0 (probe6 + final).",
+      "hook_result": "leaked",
+      "severity": "major",
+      "preventable": "partial",
+      "fix": "Enum V9 declared this class; still the top accidental hole for worktree-heavy flow. Mitigate: absolute hooksPath to a always-present machine path, or a tiny always-on wrapper outside the tree that fail-closes if tracked hooks missing; plus loud post-checkout hook. Do not pretend local hooks close it."
+    },
+    {
+      "vector": "skill-review hard-codes branch name main — rename main→master/trunk and skill-review is entirely skipped; unreviewed skill commits clean",
+      "commands_tried": "git branch -m main master; mkdir -p .claude/skills/orphan; echo '# orphan'>.../SKILL.md; git add; bash .githooks/run-gates.sh → 'main does not exist yet — skill-review skipped' rc=0; git commit success.",
+      "hook_result": "leaked",
+      "severity": "major",
+      "preventable": "yes",
+      "fix": "Resolve default branch via origin/HEAD or config init.defaultBranch / allowlist; if no integration branch, fail-closed when staged skills exist rather than skip."
+    },
+    {
+      "vector": "ack order: '# type: ignore  # reuse-ok: …' is one COMMENT token not matching ^#\\s*reuse-ok: → false-block (not a leak)",
+      "commands_tried": "scan_text(HARDROLL + '  # type: ignore  # reuse-ok: justified\\n') → 1 finding; reverse order exempts.",
+      "hook_result": "false-blocked",
+      "severity": "minor",
+      "preventable": "yes",
+      "fix": "Parse reuse-ok anywhere in the comment token, or document required order."
+    },
+    {
+      "vector": "one physical line, multiple findings, one # reuse-ok: — whole line exempt (substance CR-08 ceiling)",
+      "commands_tried": "ic=np.corrcoef(a,b); sr=r.mean()/r.std(ddof=1)*np.sqrt(252)  # reuse-ok: both → n=0 findings",
+      "hook_result": "leaked",
+      "severity": "minor",
+      "preventable": "declared-hole",
+      "fix": "Leave as CR-08 substance limit, or require per-pattern reasons."
+    }
+  ],
+  "worktree_behavior": "Linked worktree (git worktree add): core.hooksPath=.githooks is shared via common .git/config; when the worktree checkout contains .githooks/, pre-commit fires. run-gates uses git rev-parse --show-toplevel → the linked worktree root (not main tree); $ROOT/.githooks and $ROOT/harness resolve correctly; hardroll from linked worktree BLOCKS (wt_block=1). Hole: if the worktree checkout lacks .githooks/ (old rev / deleted), hooks silently no-op (V9 confirmed live). No V14 cross-bind bug found in this impl (uses show-toplevel, not $0-dir).",
+  "failopen_findings": [
+    "rm -rf .githooks while core.hooksPath=.githooks → git commit of hardroll succeeds (no hook process). Repro: install-hooks.sh; rm -rf .githooks; git add evil.py; git commit",
+    "branch not named main → skill-review skipped (declared-as-bootstrap wording) but still fails open for skills on master/trunk. Repro: git branch -m main master; commit skill",
+    "PATH without python → fail-CLOSED (gate-hook: no python). broken .venv/bin/python preferred → fail-CLOSED. missing scripts/skill-review-gate.sh while main exists → bash fails → fail-CLOSED (rc=1). harness raise RuntimeError → real run-gates fail-CLOSED (naive swallows — red-test discriminative).",
+    "No fail-open found for: write-tree with dirty unstaged skill/hardroll (index-only, PASS correctly); detached HEAD hardroll (BLOCK); pre-merge-commit --no-ff with unreviewed skill or hardroll (BLOCK)."
+  ],
+  "honesty_flags": [
+    "none — 诚实标签成立 for the grok#5 trap: commit 7644641 body, run-gates.sh L9-15, install-hooks.sh L9-11, design-decisions.md Honesty ceiling all call this an auto-fire tripwire, list --no-verify / hooksPath / uninstalled / non-commit paths, and mark real enforcement as server-side CI [DESIGNED]. test_hook_no_verify_is_a_declared_hole asserts bypass works.",
+    "soft wording only: commit subject and design title use 'enforce'/'enforcement' but immediately negate unbypassable; not friction-as-enforcement. 35 tests / 66 vectors are process counts, not claim of coverage completeness — V17 symlink half proves the count is not the tooth."
+  ],
+  "strongest": "Index-vs-worktree + AND fail-closed + write-tree skill range are real, non-performative, and naive-discriminative. Normal `git commit` of unacked hand-roll or unreviewed skill (on main) blocks; pre-merge-commit catches --no-ff. Honesty ceiling avoids grok#5 over-claim.",
+  "weakest_link": "V17 left half-open: suffix-only `.py` (case + symlink mode 120000) is a preventable scan blind-spot that was named in the enum but never red-tested or fixed — same family as CR-08 under-test. For solo accidental risk, V9 (missing/uninstalled hooks, silent no-op) remains the most likely real-world miss in a worktree-heavy repo.",
+  "one_thing_to_add": "Close V17 properly in scan_staged: (1) casefold `.py`, (2) fail-closed (or resolve+scan) on index mode 120000 for python-like paths, (3) one red-test that stages a symlink `research/f.py` → excluded hardroll and asserts BLOCK. That is the cheapest 67th-vector fix that the enum already admitted but the suite let green.",
+  "verified": [
+    "git rev-parse HEAD → 76446419441cace3ec10370d83f8a65d23be2cc0",
+    "git clone --local → /tmp/githook-review-91345/repo; bash scripts/install-hooks.sh → core.hooksPath=.githooks",
+    "pytest tests/test_githooks.py tests/test_anti_pattern_gate.py → 35 passed in ~14s",
+    "naive run-gates (worktree+HEAD+exit $?) pytest test_githooks.py → 5 failed (blocks/index/fail-closed/skill×2), 10 passed — discriminative on claimed hook teeth",
+    "REAL stage hardroll + clean worktree → run-gates rc=1; NAIVE-worktree → rc=0; NAIVE-swallow → rc=0",
+    "normal hardroll commit → blocked rc=1",
+    "mixed.Py / evil.PY staged hardroll → anti_pattern --staged PASS, commit success (case leak)",
+    "research/factor.py symlink → tests/fixture_sharpe.py → run-gates rc=0, commit success; open() reads hardroll",
+    "alias.py mode 120000 → commit success rc=0",
+    "git branch -m main master; unreviewed skill commit → success, skill-review skipped",
+    "rm -rf .githooks; hardroll commit → success rc=0",
+    "co-stage skill+review (clean) → PASS; skill-only → BLOCK; feature c1 no-verify + c2 review-only → PASS (range includes skill); amend skill without re-adding review → BLOCK",
+    "write-tree with unstaged skill+hardroll → tree has only staged clean files; gates PASS",
+    "PATH=/nonexistent → fail-closed; broken .venv/bin/python → fail-closed; missing skill-review-gate.sh → fail-closed",
+    "git merge --no-ff side with hardroll / unreviewed skill → pre-merge-commit BLOCK merge_rc=1",
+    "git worktree add linked-wt; commit hardroll → BLOCK; ROOT=linked worktree path",
+    "ack: multiline .corr( line1 + reuse-ok on close line → FLAG; f-string fake ack → FLAG; syntax-error+ack → FLAG; type-ignore-then-reuse-ok → FLAG; one-line multi-finding one ack → exempt"
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "ticket_id": "v0.1-06",
+  "status": "done",
+  "summary": "Addressed all referee findings in docs/research/bhy.md only. Removed the §6.6 fenced Python payload (replaced with a markdown summary table). Converted every Harvey–Liu–Zhu pinpoint from NBER working-paper numbering to published RFS headings (§3.3.2, §3.4.1–3.4.3, §3.5 fn.26, §3.7.2, fn.24) and noted residual WP cross-refs in RFS typesetting. Fixed the §3.1 HLZ quote to the published wording; re-anchored step-up terminology to BY 2001 / HLZ fn.23; corrected the §6.5 c(10) ratio claim, §7.3 overflow wording, and §6.1 float64 ascending-sum table.",
+  "branch": "dispatch/v01-06-bhy-20260710-171741",
+  "commit": "ad6baa8f7fb4f9def2eec74af19842b09acac552",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v01-06-bhy-20260710-171741",
+  "files_changed": [
+    {
+      "path": "docs/research/bhy.md",
+      "action": "modified",
+      "purpose": "Referee rework: no code fences; RFS pinpoints; quote/terminology/numeric wording fixes"
+    }
+  ],
+  "self_test": [
+    {
+      "cmd": "test -f docs/research/bhy.md",
+      "exit_code": 0,
+      "output_tail": "file_exit=0"
+    },
+    {
+      "cmd": "grep -q '```' docs/research/bhy.md; echo FENCE_OK if absent",
+      "exit_code": 0,
+      "output_tail": "FENCE_OK"
+    },
+    {
+      "cmd": "git add docs/research/bhy.md && git commit -m \"v0.1-06: address referee findings\"",
+      "exit_code": 0,
+      "output_tail": "[dispatch/v01-06-bhy-20260710-171741 ad6baa8] v0.1-06: address referee findings\n 1 file changed, 98 insertions(+), 67 deletions(-)"
+    },
+    {
+      "cmd": "git status --porcelain",
+      "exit_code": 0,
+      "output_tail": ""
+    },
+    {
+      "cmd": "git log --oneline -1",
+      "exit_code": 0,
+      "output_tail": "ad6baa8 v0.1-06: address referee findings"
+    }
+  ],
+  "deviations": [],
+  "open_questions": [],
+  "notes_for_referee": "§4.2/§4.3 citations in §7.5 still point to this note’s own sections (p-value construction), not HLZ. No fenced code blocks remain."
+}

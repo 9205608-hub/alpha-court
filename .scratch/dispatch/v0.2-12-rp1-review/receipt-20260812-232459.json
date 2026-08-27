@@ -1,0 +1,12 @@
+{
+  "ticket_id": "v0.2-12-RP1",
+  "status": "partial",
+  "summary": "Diff read complete. Next: red-evidence reverts for A/B/C, live attack probes, full acceptance suite.",
+  "branch": "dispatch/v0.2-12-rp1-review-20260812-232459",
+  "commit": "610f9f8272c73e50d802a4012819c5e96a95a3db",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v0.2-12-rp1-review-20260812-232459",
+  "files_changed": [],
+  "self_test": [],
+  "deviations": [],
+  "open_questions": []
+}

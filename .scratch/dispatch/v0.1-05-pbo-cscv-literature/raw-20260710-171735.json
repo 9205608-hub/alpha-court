@@ -1,0 +1,48 @@
+{
+  "text": "{ \"ticket_id\": \"v0.1-05\", \"status\": \"partial\", \"summary\": \"Starting PBO/CSCV literature note from public sources.\", \"branch\": \"\", \"commit\": \"\", \"worktree_path\": \"\", \"files_changed\": [], \"self_test\": [], \"deviations\": [], \"open_questions\": [] }{ \"ticket_id\": \"v0.1-05\", \"status\": \"partial\", \"summary\": \"Drafting docs/research/pbo-cscv.md from Bailey et al. CSCV paper.\", \"branch\": \"dispatch/v01-05-pbo-20260710-171735\", \"commit\": \"\", \"worktree_path\": \"[HOME]/.alpha-court/dispatch-worktrees/v01-05-pbo-20260710-171735\", \"files_changed\": [], \"self_test\": [], \"deviations\": [], \"open_questions\": [] }{\n  \"ticket_id\": \"v0.1-05\",\n  \"status\": \"done\",\n  \"summary\": \"Wrote docs/research/pbo-cscv.md as an implementation-grade PBO/CSCV literature note from Bailey et al. (JCF 2017 / SSRN 2326253). The note covers sources, the T×N input matrix M, the full CSCV algorithm with paper notation and pseudocode, complexity for practical S, a hand-worked S=4/N=3/T=8 test vector with all 6 splits and PBO=1/2, and implementation pitfalls including which non-PBO diagnostics are out of v0.1 scope.\",\n  \"branch\": \"dispatch/v01-05-pbo-20260710-171735\",\n  \"commit\": \"e9ec55bb5853c1b3e7ab941595b85c5efee4c9fa\",\n  \"worktree_path\": \"[HOME]/.alpha-court/dispatch-worktrees/v01-05-pbo-20260710-171735\",\n  \"files_changed\": [\n    {\n      \"path\": \"docs/research/pbo-cscv.md\",\n      \"action\": \"added\",\n      \"purpose\": \"Implementation-grade PBO/CSCV literature note with citations, pseudocode, and hand-worked S=4 test vector\"\n    }\n  ],\n  \"self_test\": [\n    {\n      \"cmd\": \"test -f docs/research/pbo-cscv.md\",\n      \"exit_code\": 0,\n      \"output_tail\": \"\"\n    },\n    {\n      \"cmd\": \"git status --porcelain\",\n      \"exit_code\": 0,\n      \"output_tail\": \"\"\n    },\n    {\n      \"cmd\": \"git log --oneline -1\",\n      \"exit_code\": 0,\n      \"output_tail\": \"e9ec55b v0.1-05: PBO/CSCV literature note\"\n    }\n  ],\n  \"deviations\": [\n    \"Section 5 test vector uses mean return as the performance metric R rather than Sharpe, which the paper allows via metric pluggability; chosen so every ranking and λ is hand-exact with no std-dev edge cases.\",\n    \"Paper body prints binom(16,8)=12,780; note records the correct binomial 12,870 and flags the discrepancy.\"\n  ],\n  \"open_questions\": [\n    \"v0.1 code will need an explicit convention for metric ties and argmax index ties; paper examples assume unique rankings.\",\n    \"Exact Sharpe definition (excess return, ddof, annualization) left to the implementation ticket when metric=R Sharpe is wired.\"\n  ],\n  \"notes_for_referee\": \"Primary algorithm map is Alg. 2.3 / Def. 2.2 / §3.1 in the Feb 2015 author PDF. Recompute §5 combinations 1–6 from the integer matrix; expected logits {0, ln(1/3), 0, 0, ln(1/3), ln(1/3)} and PBO=0.5. Only docs/research/pbo-cscv.md was added.\"\n}",
+  "stopReason": "EndTurn",
+  "sessionId": "019f4b51-7a3a-7533-9d31-43c6dc1f171c",
+  "requestId": "680a7f36-e92b-4467-8dfc-5dd5b1dbbb14",
+  "thought": "The user wants me to implement a literature note for PBO/CSCV as a documentation ticket. Let me follow the instructions carefully:\nLet me fetch the actual PDF paper from David Bailey's website and extract the algorithm details carefully.pdftotext exists. Let me extract the text.Let me extract the algorithm section carefully from the PDF.rg not available in shell, use grepI need the detailed algorithm section - lines 399-550 roughly.I have a good understanding of the algorithm. There's a notation issue in the OCR - the paper uses:{\n  \"branch\": \"main\",\n  \"commit\": \"placeholder\",\n  \"worktree_path\": \"/tmp/alpha-court-worktree\",\n  \"ticket_id\": \"v0.1-05\"\n} \n\nI need to create the documentation file as specified. Let me start by writing the PBO/CSC V literature note based on the paper details you've provided.\n\nFirst, I'll create the directory structure and then write the markdown file. Let me begin with the sources section. \n\nThe paper is Bailey et al. (2017) \"The Probability of Backtest Overfitting\" from Journal of Computational Finance. The SSRN preprint 2326253 is the key source.\n\nLet me write the full document now. I'll use the details you've provided about the notation and the test vector design. \n\nFor the test vector, I'll use a simple mean return as the performance metric for clarity in hand calculations, noting that the paper uses Sharpe ratio by default. I'll carefully design the matrix so that rankings are unambiguous.\n\nHere's the complete document: \n\n```markdown\n# PBO/CSCV Literature Note\n\n## Sources\n\nBailey, D. H., Borwein, J., López de Prado, M., & Zhu, Q. J. (2017). The Probability of Backtest Overfitting. *Journal of Computational Finance*, 20(4). (SSRN preprint 2326253, 2013).\n\nThis paper provides the foundational framework for PBO estimation via CSCV.I found a good second matrix with PBO=0.5 which is interesting. Let me also craft a cleaner pedagogical matrix by hand that has varied rankings.\nThere's a minor OCR issue with the formula for logit. Looking at the text:```markdown\n# PBO/CSCV Literature Note\n\n## Sources\n\nBailey, D. H., Borwein, J., López de Prado, M. & Zhu, Q. J. (2017). The Probability of Backtest Overfitting. *Journal of Computational Finance* 20(4).Good. I'll document exact means as fractions where helpful.\nLet me check if there are other research literature notes already (DSR etc) for style, or the ticket itself.I have enough to write a high-quality literature note. Let me also verify the Journal of Computational Finance citation details.Now I'll write the comprehensive document. Note: paper prints C(16,8) as 12,780 but correct value is 12,870. I'll cite the correct combinatorial value and note the paper's printed figure.\nNow write the full document.Now run acceptance criteria and commit.git status --porcelain was empty (exit 0). Let me also re-run the exact acceptance commands with exit codes for the receipt.\nFinal output must be ONLY the JSON receipt.",
+  "structuredOutput": {
+    "ticket_id": "v0.1-05",
+    "status": "done",
+    "summary": "Wrote docs/research/pbo-cscv.md as an implementation-grade PBO/CSCV literature note from Bailey et al. (JCF 2017 / SSRN 2326253). The note covers sources, the T×N input matrix M, the full CSCV algorithm with paper notation and pseudocode, complexity for practical S, a hand-worked S=4/N=3/T=8 test vector with all 6 splits and PBO=1/2, and implementation pitfalls including which non-PBO diagnostics are out of v0.1 scope.",
+    "branch": "dispatch/v01-05-pbo-20260710-171735",
+    "commit": "e9ec55bb5853c1b3e7ab941595b85c5efee4c9fa",
+    "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v01-05-pbo-20260710-171735",
+    "files_changed": [
+      {
+        "path": "docs/research/pbo-cscv.md",
+        "action": "added",
+        "purpose": "Implementation-grade PBO/CSCV literature note with citations, pseudocode, and hand-worked S=4 test vector"
+      }
+    ],
+    "self_test": [
+      {
+        "cmd": "test -f docs/research/pbo-cscv.md",
+        "exit_code": 0,
+        "output_tail": ""
+      },
+      {
+        "cmd": "git status --porcelain",
+        "exit_code": 0,
+        "output_tail": ""
+      },
+      {
+        "cmd": "git log --oneline -1",
+        "exit_code": 0,
+        "output_tail": "e9ec55b v0.1-05: PBO/CSCV literature note"
+      }
+    ],
+    "deviations": [
+      "Section 5 test vector uses mean return as the performance metric R rather than Sharpe, which the paper allows via metric pluggability; chosen so every ranking and λ is hand-exact with no std-dev edge cases.",
+      "Paper body prints binom(16,8)=12,780; note records the correct binomial 12,870 and flags the discrepancy."
+    ],
+    "open_questions": [
+      "v0.1 code will need an explicit convention for metric ties and argmax index ties; paper examples assume unique rankings.",
+      "Exact Sharpe definition (excess return, ddof, annualization) left to the implementation ticket when metric=R Sharpe is wired."
+    ],
+    "notes_for_referee": "Primary algorithm map is Alg. 2.3 / Def. 2.2 / §3.1 in the Feb 2015 author PDF. Recompute §5 combinations 1–6 from the integer matrix; expected logits {0, ln(1/3), 0, 0, ln(1/3), ln(1/3)} and PBO=0.5. Only docs/research/pbo-cscv.md was added."
+  }
+}

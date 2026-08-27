@@ -1,0 +1,85 @@
+{
+  "text": "{ \"ticket_id\": \"v0.2-07-rework-01\", \"status\": \"partial\", \"summary\": \"Resuming rework-01: judgment event, anchor query-by-head, one-policy invariant. Reading current code then red tests first.\", \"branch\": \"dispatch/v02-07-certified-run-20260716-200904\", \"commit\": \"d198d109c3d6382c21645fc2d02af3141cae9dfd\", \"worktree_path\": \"[HOME]/.alpha-court/dispatch-worktrees/v02-07-certified-run-20260716-200904\", \"files_changed\": [], \"self_test\": [], \"deviations\": [], \"open_questions\": [] }{ \"ticket_id\": \"v0.2-07-rework-01\", \"status\": \"partial\", \"summary\": \"Adding red-first tests for judgment brick, anchor fail-closed, and one-policy invariant.\", \"branch\": \"dispatch/v02-07-certified-run-20260716-200904\", \"commit\": \"d198d109c3d6382c21645fc2d02af3141cae9dfd\", \"worktree_path\": \"[HOME]/.alpha-court/dispatch-worktrees/v02-07-certified-run-20260716-200904\", \"files_changed\": [], \"self_test\": [], \"deviations\": [], \"open_questions\": [] }{ \"ticket_id\": \"v0.2-07-rework-01\", \"status\": \"partial\", \"summary\": \"Clarifying Finding A tests: matching backend passes without manifest; empty backend must raise (fail-closed consult).\", \"branch\": \"dispatch/v02-07-certified-run-20260716-200904\", \"commit\": \"d198d109c3d6382c21645fc2d02af3141cae9dfd\", \"worktree_path\": \"[HOME]/.alpha-court/dispatch-worktrees/v02-07-certified-run-20260716-200904\", \"files_changed\": [], \"self_test\": [], \"deviations\": [], \"open_questions\": [] }{ \"ticket_id\": \"v0.2-07-rework-01\", \"status\": \"partial\", \"summary\": \"Red phase recorded (10 failed). Implementing judgment event, anchor verify(head), and verify invariants.\", \"branch\": \"dispatch/v02-07-certified-run-20260716-200904\", \"commit\": \"d198d109c3d6382c21645fc2d02af3141cae9dfd\", \"worktree_path\": \"[HOME]/.alpha-court/dispatch-worktrees/v02-07-certified-run-20260716-200904\", \"files_changed\": [], \"self_test\": [], \"deviations\": [], \"open_questions\": [] }{ \"ticket_id\": \"v0.2-07-rework-01\", \"status\": \"partial\", \"summary\": \"Updating wild-verdict test: seal now refuses when judgment does not cover all verdicts.\", \"branch\": \"dispatch/v02-07-certified-run-20260716-200904\", \"commit\": \"d198d109c3d6382c21645fc2d02af3141cae9dfd\", \"worktree_path\": \"[HOME]/.alpha-court/dispatch-worktrees/v02-07-certified-run-20260716-200904\", \"files_changed\": [], \"self_test\": [], \"deviations\": [], \"open_questions\": [] }{\n  \"ticket_id\": \"v0.2-07-rework-01\",\n  \"status\": \"done\",\n  \"summary\": \"Closed two contract-fault fail-opens and minor panel nits. CertifiedRun.judge now appends a court-opaque judgment declaration only after court.judge succeeds; open() recovers sealability only from that event (verdicts without judgment → seal CertificationError). AnchorBackend.verify(chain_head) queries the backend's own state; verify(path, anchor=...) always consults the backend on the recomputed head and never gates on the manifest. verify also requires exactly one aggregation_policy (FIX 3) and one covering judgment (inv 7.5), moves replay-on-COPY under inv 1, reports manifest.anchor_ref faithfully, and GitAnchor takes optional committer identity. Red-first then green: 44 targeted tests, full suite 455 passed + 1 skipped.\",\n  \"branch\": \"dispatch/v02-07-certified-run-20260716-200904\",\n  \"commit\": \"b05fea7faaa92ccec5d1ffd9445b2d57a8e77771\",\n  \"worktree_path\": \"[HOME]/.alpha-court/dispatch-worktrees/v02-07-certified-run-20260716-200904\",\n  \"files_changed\": [\n    {\n      \"path\": \"harness/run.py\",\n      \"action\": \"modified\",\n      \"purpose\": \"judgment declaration after successful judge; open/seal incomplete-judgment refuse\"\n    },\n    {\n      \"path\": \"harness/anchor.py\",\n      \"action\": \"modified\",\n      \"purpose\": \"verify(chain_head) query-by-head; GitAnchor committer params (F-5)\"\n    },\n    {\n      \"path\": \"harness/verify.py\",\n      \"action\": \"modified\",\n      \"purpose\": \"inv 7.5 judgment, one-policy, anchor consult, inv1 copy-replay, F-6\"\n    },\n    {\n      \"path\": \"tests/test_certified_run.py\",\n      \"action\": \"modified\",\n      \"purpose\": \"F-1 brick-open red test; judgment happy path; F-4 tighten\"\n    },\n    {\n      \"path\": \"tests/test_harness_verify.py\",\n      \"action\": \"modified\",\n      \"purpose\": \"Finding A anchors, orphan judgment, two-policy, F-3 inv1/inv2\"\n    }\n  ],\n  \"self_test\": [\n    {\n      \"cmd\": \".venv/bin/python -m pytest tests/test_certified_run.py tests/test_harness_verify.py -q --tb=line  # red (pre-impl)\",\n      \"exit_code\": 1,\n      \"output_tail\": \"FAILED tests/test_certified_run.py::test_mid_battery_brick_open_refuses_seal\\nFAILED tests/test_harness_verify.py::test_verify_orphan_verdicts_seal_without_judgment_fails\\nFAILED tests/test_harness_verify.py::test_anchor_deleted_manifest_empty_backend_raises\\n10 failed, 34 passed in 3.58s\"\n    },\n    {\n      \"cmd\": \".venv/bin/python -m pytest tests/test_certified_run.py tests/test_harness_verify.py -q\",\n      \"exit_code\": 0,\n      \"output_tail\": \"............................................ [100%]\\n44 passed in 3.12s\"\n    },\n    {\n      \"cmd\": \".venv/bin/python -m pytest -q\",\n      \"exit_code\": 0,\n      \"output_tail\": \"....................... [100%]\\n455 passed, 1 skipped in 709.45s (0:11:49)\"\n    },\n    {\n      \"cmd\": \".venv/bin/ruff check .\",\n      \"exit_code\": 0,\n      \"output_tail\": \"All checks passed!\"\n    }\n  ],\n  \"deviations\": [\n    \"Finding A red scenarios (a)/(b) in the rework note say verify(anchor=real) raises after manifest delete/blank; implementing FIX 2 query-by-recomputed-head, a matching FileAnchor that pinned the head still PASSES without relying on the manifest. Fail-open is closed by consulting empty/wrong backends (raises) and by (c) forged-head-not-attested. Matching-backend-without-manifest PASS is intentional under FIX 2.\"\n  ],\n  \"open_questions\": [],\n  \"notes_for_referee\": \"Reproduce F-1: mid-battery dsr-missing brick → open() → seal() raises CertificationError with exact message 'judged run incomplete: verdicts without a judgment event'. Finding A: delete manifest or null anchor_ref, supply empty FileAnchor → CertificationError 'anchor supplied but does not attest the recomputed head'; matching FileAnchor still passes. Diff touches only owned harness/test files (5 files; __init__ unchanged this rework).\"\n}",
+  "stopReason": "EndTurn",
+  "sessionId": "019f6ad4-9ffe-7b01-bc83-6e36fb72bfa5",
+  "requestId": "642497ea-844c-468c-a189-06d2dfb58242",
+  "thought": "The user wants me to implement rework-01 for v0.2-07 with three main fixes and several minor fixes. Let me plan this carefully:\nI need to update the tests and implementation. Let me also read the relevant test sections to know what to modify.\nGot it — I've reviewed the spec changes and the test sections. I'll update the implementation and tests accordingly, focusing on the key changes for judgment event, anchor verification, and the policy invariant.\n\nLet me start by updating the anchor.py to support the new verify method and handle the committer identity parameter. Then I'll tackle the verify.py changes, and finally the run.py for the judgment logic. I'll also update the types and tests as needed.\n\nHere's my plan:\n\n1. Update anchor.py to implement verify(self, chain_head: str) -> bool\n2. Make GitAnchor.committer_identity a constructor parameter\n3. Update VerificationReport to anchor_ref: Any\n4. Update run.py for judgment event handling\n5. Update verify.py for new invariants and anchor verification\n6. Update tests for the new red-first scenarios\n\nLet me implement these changes. First, let's update anchor.py:response0<|tool_call_argument_begin|>assistant:Got it — I've reviewed the spec changes and the test sections. I'll update the implementation and tests accordingly, focusing on the key changes for judgment event, anchor verification, and the policy invariant.\n\nLet me start by updating the anchor.py to support the new verify method and handle the committer identity parameter. Then I'll tackle the verify.py changes, and finally the run.py for the judgment logic. I'll also update the types and tests as needed.\n\nHere's my plan:\n\n1. Update anchor.py to implement verify(self, chain_head: str) -> bool\n2. Make GitAnchor.committer_identity a constructor parameter\n3.I'll implement everything comprehensively. First add red tests and update existing ones, then implement. For red phase I'll add new tests that fail, run pytest to capture red, then implement.\nNow update test_harness_verify.py with all the new tests and API changes.Re-read Finding A carefully:\nI see the tension you're pointing out. Let me walk through the new spec carefully.\n\nThe core bug in Finding A was that deleting the manifest caused the anchor check to be skipped entirely, so even a fake anchor would pass verification. The fix is to always query the backend by the recomputed head when an anchor is supplied — that eliminates the silent-disable.\n\nBut the red-test wording in the rework note says:\n- honest sealed run, rm manifest, verify(anchor=real) → raises\n\nThat seems backwards. If the anchor is \"real\" (i.e., the one that actually pinned the head), then after the fix the check should 100% pass — same as test case (d).\n\nI suspect the note meant:\n- honest sealed run, rm manifest, verify(anchor=FAKE) → raises (the fail-open case)\n- or perhaps they intended to say that supplying an anchor after manifest deletion should still work, but the wording got flipped.\n\nLooking at the evidence:\n\"after DELETING manifest, verify(anchor=real) STILL PASS -> Finding A CONFIRMED (anchor not consulted)\"\n\nThe bug was PASSing when it shouldn't have — but actually, the bug was PASSing *regardless* of whether the anchor was real or fake.Red phase confirmed with 10 failures. Now implement all the code changes.There's an ordering issue: invariant 1 replay-on-copy needs recomputed head, which needs chain validation. But inv 2 is \"chained\". The ticket says move replay-on-COPY into invariant 1. So I compute fi...The wild verdict test now calls seal() which will raise ValueError because judgment vids don't match all verdicts. I need to update this test - either:44 passed. Now ruff and full suite.Fix the unused variableWait for full suiteStill running full suite. Wait more.Still running at 47%. Wait more.All green: 455 passed, 1 skipped. Now commit and produce receipt.Note: harness/__init__.py wasn't modified this rework - only 5 files changed which is fine (still only owned files).\n",
+  "usage": {
+    "input_tokens": 53760,
+    "cache_read_input_tokens": 1947776,
+    "output_tokens": 29212,
+    "reasoning_tokens": 12627,
+    "total_tokens": 2030748
+  },
+  "num_turns": 15,
+  "modelUsage": {
+    "grok-4.5": {
+      "inputTokens": 53760,
+      "outputTokens": 29212,
+      "cacheReadInputTokens": 1947776,
+      "modelCalls": 15
+    }
+  },
+  "structuredOutput": {
+    "ticket_id": "v0.2-07-rework-01",
+    "status": "done",
+    "summary": "Closed two contract-fault fail-opens and minor panel nits. CertifiedRun.judge now appends a court-opaque judgment declaration only after court.judge succeeds; open() recovers sealability only from that event (verdicts without judgment → seal CertificationError). AnchorBackend.verify(chain_head) queries the backend's own state; verify(path, anchor=...) always consults the backend on the recomputed head and never gates on the manifest. verify also requires exactly one aggregation_policy (FIX 3) and one covering judgment (inv 7.5), moves replay-on-COPY under inv 1, reports manifest.anchor_ref faithfully, and GitAnchor takes optional committer identity. Red-first then green: 44 targeted tests, full suite 455 passed + 1 skipped.",
+    "branch": "dispatch/v02-07-certified-run-20260716-200904",
+    "commit": "b05fea7faaa92ccec5d1ffd9445b2d57a8e77771",
+    "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v02-07-certified-run-20260716-200904",
+    "files_changed": [
+      {
+        "path": "harness/run.py",
+        "action": "modified",
+        "purpose": "judgment declaration after successful judge; open/seal incomplete-judgment refuse"
+      },
+      {
+        "path": "harness/anchor.py",
+        "action": "modified",
+        "purpose": "verify(chain_head) query-by-head; GitAnchor committer params (F-5)"
+      },
+      {
+        "path": "harness/verify.py",
+        "action": "modified",
+        "purpose": "inv 7.5 judgment, one-policy, anchor consult, inv1 copy-replay, F-6"
+      },
+      {
+        "path": "tests/test_certified_run.py",
+        "action": "modified",
+        "purpose": "F-1 brick-open red test; judgment happy path; F-4 tighten"
+      },
+      {
+        "path": "tests/test_harness_verify.py",
+        "action": "modified",
+        "purpose": "Finding A anchors, orphan judgment, two-policy, F-3 inv1/inv2"
+      }
+    ],
+    "self_test": [
+      {
+        "cmd": ".venv/bin/python -m pytest tests/test_certified_run.py tests/test_harness_verify.py -q --tb=line  # red (pre-impl)",
+        "exit_code": 1,
+        "output_tail": "FAILED tests/test_certified_run.py::test_mid_battery_brick_open_refuses_seal\nFAILED tests/test_harness_verify.py::test_verify_orphan_verdicts_seal_without_judgment_fails\nFAILED tests/test_harness_verify.py::test_anchor_deleted_manifest_empty_backend_raises\n10 failed, 34 passed in 3.58s"
+      },
+      {
+        "cmd": ".venv/bin/python -m pytest tests/test_certified_run.py tests/test_harness_verify.py -q",
+        "exit_code": 0,
+        "output_tail": "............................................ [100%]\n44 passed in 3.12s"
+      },
+      {
+        "cmd": ".venv/bin/python -m pytest -q",
+        "exit_code": 0,
+        "output_tail": "....................... [100%]\n455 passed, 1 skipped in 709.45s (0:11:49)"
+      },
+      {
+        "cmd": ".venv/bin/ruff check .",
+        "exit_code": 0,
+        "output_tail": "All checks passed!"
+      }
+    ],
+    "deviations": [
+      "Finding A red scenarios (a)/(b) in the rework note say verify(anchor=real) raises after manifest delete/blank; implementing FIX 2 query-by-recomputed-head, a matching FileAnchor that pinned the head still PASSES without relying on the manifest. Fail-open is closed by consulting empty/wrong backends (raises) and by (c) forged-head-not-attested. Matching-backend-without-manifest PASS is intentional under FIX 2."
+    ],
+    "open_questions": [],
+    "notes_for_referee": "Reproduce F-1: mid-battery dsr-missing brick → open() → seal() raises CertificationError with exact message 'judged run incomplete: verdicts without a judgment event'. Finding A: delete manifest or null anchor_ref, supply empty FileAnchor → CertificationError 'anchor supplied but does not attest the recomputed head'; matching FileAnchor still passes. Diff touches only owned harness/test files (5 files; __init__ unchanged this rework)."
+  }
+}

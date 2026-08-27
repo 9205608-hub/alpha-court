@@ -1,0 +1,12 @@
+{
+  "ticket_id": "v0.1-09",
+  "status": "partial",
+  "summary": "pyqlib installed on Python 3.11.2. Next: download community data pack and smoke-validate.",
+  "branch": "dispatch/v01-09-qlibcn-20260710-171748",
+  "commit": "",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v01-09-qlibcn-20260710-171748",
+  "files_changed": [],
+  "self_test": [],
+  "deviations": [],
+  "open_questions": []
+}

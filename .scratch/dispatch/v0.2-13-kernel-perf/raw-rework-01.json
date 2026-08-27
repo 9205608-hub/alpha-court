@@ -1,0 +1,87 @@
+{
+  "text": "{\"ticket_id\": \"v0.2-13-rework-01\", \"status\": \"partial\", \"summary\": \"Resuming: vectorize slow-path masked ranks; TDD red on churn tests first.\", \"branch\": \"\", \"commit\": \"\", \"worktree_path\": \"\", \"files_changed\": [], \"self_test\": [], \"deviations\": [], \"open_questions\": []}{\"ticket_id\": \"v0.2-13-rework-01\", \"status\": \"partial\", \"summary\": \"Adding churn perf + large-churn equivalence tests (TDD red), then unified masked-rank IC path.\", \"branch\": \"dispatch/v02-13-kernel-perf-20260717-214417\", \"commit\": \"25f6d508e1d7474ddd969d559142dad66ccf0fd9\", \"worktree_path\": \"[HOME]/.alpha-court/dispatch-worktrees/v02-13-kernel-perf-20260717-214417\", \"files_changed\": [], \"self_test\": [], \"deviations\": [], \"open_questions\": []}{\"ticket_id\": \"v0.2-13-rework-01\", \"status\": \"partial\", \"summary\": \"Implementing unified _masked_avg_ranks IC path while red tests run.\", \"branch\": \"dispatch/v02-13-kernel-perf-20260717-214417\", \"commit\": \"25f6d508e1d7474ddd969d559142dad66ccf0fd9\", \"worktree_path\": \"[HOME]/.alpha-court/dispatch-worktrees/v02-13-kernel-perf-20260717-214417\", \"files_changed\": [], \"self_test\": [], \"deviations\": [], \"open_questions\": []}{\"ticket_id\": \"v0.2-13\", \"status\": \"done\", \"summary\": \"Rework-01: replaced the dual fast/slow IC branch with a unified vectorized path — `_masked_avg_ranks` (stable-sort average ranks within the joint mask) plus existing `_masked_row_pearson`, looping only over offsets. When scores are fully finite, joint is offset-independent and label ranks are computed once and reused. Added large PIT-churn equivalence coverage and `test_evaluate_shifted_ic_churn_panel_under_5s`. Returns branch untouched.\", \"branch\": \"dispatch/v02-13-kernel-perf-20260717-214417\", \"commit\": \"9b41e16ed1b2419fa1f5fec766b1baacabcd46fb\", \"worktree_path\": \"[HOME]/.alpha-court/dispatch-worktrees/v02-13-kernel-perf-20260717-214417\", \"files_changed\": [{\"path\": \"adapters/qlib_cn.py\", \"action\": \"modified\", \"purpose\": \"Add _masked_avg_ranks; rewrite IC _shared_kernel to unified per-offset masked-rank + masked Pearson (dense-score label-rank cache)\"}, {\"path\": \"tests/test_adapter_kernel_perf.py\", \"action\": \"modified\", \"purpose\": \"Large PIT-churn equivalence test + churn panel <5s perf gate; keep dense <3s gate\"}], \"self_test\": [{\"cmd\": \"TDD red (pre-vectorize slow path): .venv/bin/python -m pytest tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_churn_panel_under_5s tests/test_adapter_kernel_perf.py::test_shared_kernel_ic_matches_reference_large_pit_churn -v\", \"exit_code\": 1, \"output_tail\": \"FAILED tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_churn_panel_under_5s - AssertionError: churn evaluate_shifted(199) took 34.939s (budget 5.0s)\\n========================= 1 failed, 1 passed in 35.58s =========================\"}, {\"cmd\": \".venv/bin/python -m pytest tests/test_adapter_kernel_perf.py -v\", \"exit_code\": 0, \"output_tail\": \"tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_churn_panel_under_5s PASSED\\n============================== 9 passed in 4.48s ===============================\"}, {\"cmd\": \".venv/bin/python -m pytest tests/test_adapter_qlib_cn.py tests/test_adapter_labels.py tests/test_adapter_kernel_perf.py -v\", \"exit_code\": 0, \"output_tail\": \"======================== 10 passed, 1 skipped in 4.45s =========================\"}, {\"cmd\": \".venv/bin/python -m pytest --ignore=tests/test_killer_demo.py -q\", \"exit_code\": 0, \"output_tail\": \"490 passed, 2 skipped in 57.93s\"}, {\"cmd\": \".venv/bin/ruff check .\", \"exit_code\": 0, \"output_tail\": \"All checks passed!\"}, {\"cmd\": \"timed evaluate_shifted(199) dense + churn (T=480,N=336) after rework\", \"exit_code\": 0, \"output_tail\": \"dense elapsed=2.0750s shape=(199, 480)\\ndense max_abs=0.0 max_rel=0.0\\nchurn elapsed=1.9756s shape=(199, 480)\\nchurn max_abs=0.0 max_rel=0.0\"}, {\"cmd\": \"git diff --stat 7ef5f03fbcc0cb42a43c2554f528c24e7080705d..HEAD\", \"exit_code\": 0, \"output_tail\": \" adapters/qlib_cn.py               | 133 ++++++++++++-----\\n tests/test_adapter_kernel_perf.py | 294 ++++++++++++++++++++++++++++++++++++++\\n 2 files changed, 394 insertions(+), 33 deletions(-)\"}], \"deviations\": [\"Full `python3 -m pytest` without --ignore still hits the pre-existing matplotlib `[demo]`-extra gap in tests/test_killer_demo.py; ran with `--ignore=tests/test_killer_demo.py` (490 passed). Not introduced by this ticket.\", \"Chose a single unified masked-rank path for all dates (no remaining fast/slow branch in IC); denser optional reuse of label ranks when score_finite is all-True.\", \"Helpers `_pearson` / `_rank_panel` / `_ranks_within_joint` left in place (numeric semantics unchanged; reference tests and returns path still rely on them / same definitions).\"], \"open_questions\": [], \"notes_for_referee\": \"Churn red: 34.94s → green ~1.98s on (480,336)×199 with ~12% PIT drop/date. Dense ~2.08s. Equivalence max abs/rel vs frozen double-loop reference: 0.0 on both dense and churn batteries (bit-identical). `kind=\\\"stable\\\"` argsort preserves mergesort tie order. Prior fast-path commit 25f6d508 is ancestor; this is 9b41e16e on top.\"}",
+  "stopReason": "EndTurn",
+  "sessionId": "019f7052-2936-7c93-9344-36568e9b674e",
+  "requestId": "3c038953-a193-4f0a-a61a-1e5a9edec7e8",
+  "thought": "The user wants me to rework the IC kernel vectorization to also vectorize the slow path (masked rank-within-joint), since on real csi300 data all dates hit the slow path due to PIT churn.\nI'll:\n1. Add churn perf test + larger PIT-churn equivalence case to tests firstI'll implement the unified masked-rank vectorization as the cleaner single-path approach, and add the larger-scale PIT-churn equivalence test to ensure bit-identical results on real-scale data. Let me start by updating the test file with the new churn tests. \n\nFirst, I'll add the larger-scale equivalence test and the churn perf test. Since the existing battery already has \"pit_churn\", I'll enhance it with a larger panel. \n\nLet me write the code changes. First, the test file update. \n\n**test_adapter_kernel_perf.py** - adding larger churn test and perf test. \n\n```python\n# ... existing imports ...While waiting for the red test, I'll implement the vectorized slow path. The churn perf test will likely fail if it's >5s, or pass if the machine is fast enough with the current slow path.There's a type issue: `ry = label_ranks_cached` when scores_dense - ry could be None to the type checker but we know it's set. Fine at runtime.\nInteresting - the red test ran AFTER I already modified the adapter? Looking at the timeline:All green in 4.48s total. Let me get exact timings for dense and churn, ruff, full pytest, and commit.Wait for completion.Dense is 2.07s - under 3s budget. Churn is 1.97s - under 5s. Bit-identical max_abs=0.0.\n_rank_panel and _ranks_within_joint and _pearson are no longer called from the IC path in adapters/qlib_cn.py - they're only defined. They might be dead code now. Ruff might flag F401 unused if they w...",
+  "usage": {
+    "input_tokens": 21353,
+    "cache_read_input_tokens": 631040,
+    "output_tokens": 9900,
+    "reasoning_tokens": 3053,
+    "total_tokens": 662293
+  },
+  "num_turns": 9,
+  "modelUsage": {
+    "grok-4.5": {
+      "inputTokens": 21353,
+      "outputTokens": 9900,
+      "cacheReadInputTokens": 631040,
+      "modelCalls": 9
+    }
+  },
+  "structuredOutput": {
+    "ticket_id": "v0.2-13",
+    "status": "done",
+    "summary": "Rework-01: replaced the dual fast/slow IC branch with a unified vectorized path — `_masked_avg_ranks` (stable-sort average ranks within the joint mask) plus existing `_masked_row_pearson`, looping only over offsets. When scores are fully finite, joint is offset-independent and label ranks are computed once and reused. Added large PIT-churn equivalence coverage and `test_evaluate_shifted_ic_churn_panel_under_5s`. Returns branch untouched.",
+    "branch": "dispatch/v02-13-kernel-perf-20260717-214417",
+    "commit": "9b41e16ed1b2419fa1f5fec766b1baacabcd46fb",
+    "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v02-13-kernel-perf-20260717-214417",
+    "files_changed": [
+      {
+        "path": "adapters/qlib_cn.py",
+        "action": "modified",
+        "purpose": "Add _masked_avg_ranks; rewrite IC _shared_kernel to unified per-offset masked-rank + masked Pearson (dense-score label-rank cache)"
+      },
+      {
+        "path": "tests/test_adapter_kernel_perf.py",
+        "action": "modified",
+        "purpose": "Large PIT-churn equivalence test + churn panel <5s perf gate; keep dense <3s gate"
+      }
+    ],
+    "self_test": [
+      {
+        "cmd": "TDD red (pre-vectorize slow path): .venv/bin/python -m pytest tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_churn_panel_under_5s tests/test_adapter_kernel_perf.py::test_shared_kernel_ic_matches_reference_large_pit_churn -v",
+        "exit_code": 1,
+        "output_tail": "FAILED tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_churn_panel_under_5s - AssertionError: churn evaluate_shifted(199) took 34.939s (budget 5.0s)\n========================= 1 failed, 1 passed in 35.58s ========================="
+      },
+      {
+        "cmd": ".venv/bin/python -m pytest tests/test_adapter_kernel_perf.py -v",
+        "exit_code": 0,
+        "output_tail": "tests/test_adapter_kernel_perf.py::test_evaluate_shifted_ic_churn_panel_under_5s PASSED\n============================== 9 passed in 4.48s ==============================="
+      },
+      {
+        "cmd": ".venv/bin/python -m pytest tests/test_adapter_qlib_cn.py tests/test_adapter_labels.py tests/test_adapter_kernel_perf.py -v",
+        "exit_code": 0,
+        "output_tail": "======================== 10 passed, 1 skipped in 4.45s ========================="
+      },
+      {
+        "cmd": ".venv/bin/python -m pytest --ignore=tests/test_killer_demo.py -q",
+        "exit_code": 0,
+        "output_tail": "490 passed, 2 skipped in 57.93s"
+      },
+      {
+        "cmd": ".venv/bin/ruff check .",
+        "exit_code": 0,
+        "output_tail": "All checks passed!"
+      },
+      {
+        "cmd": "timed evaluate_shifted(199) dense + churn (T=480,N=336) after rework",
+        "exit_code": 0,
+        "output_tail": "dense elapsed=2.0750s shape=(199, 480)\ndense max_abs=0.0 max_rel=0.0\nchurn elapsed=1.9756s shape=(199, 480)\nchurn max_abs=0.0 max_rel=0.0"
+      },
+      {
+        "cmd": "git diff --stat 7ef5f03fbcc0cb42a43c2554f528c24e7080705d..HEAD",
+        "exit_code": 0,
+        "output_tail": " adapters/qlib_cn.py               | 133 ++++++++++++-----\n tests/test_adapter_kernel_perf.py | 294 ++++++++++++++++++++++++++++++++++++++\n 2 files changed, 394 insertions(+), 33 deletions(-)"
+      }
+    ],
+    "deviations": [
+      "Full `python3 -m pytest` without --ignore still hits the pre-existing matplotlib `[demo]`-extra gap in tests/test_killer_demo.py; ran with `--ignore=tests/test_killer_demo.py` (490 passed). Not introduced by this ticket.",
+      "Chose a single unified masked-rank path for all dates (no remaining fast/slow branch in IC); denser optional reuse of label ranks when score_finite is all-True.",
+      "Helpers `_pearson` / `_rank_panel` / `_ranks_within_joint` left in place (numeric semantics unchanged; reference tests and returns path still rely on them / same definitions)."
+    ],
+    "open_questions": [],
+    "notes_for_referee": "Churn red: 34.94s → green ~1.98s on (480,336)×199 with ~12% PIT drop/date. Dense ~2.08s. Equivalence max abs/rel vs frozen double-loop reference: 0.0 on both dense and churn batteries (bit-identical). `kind=\"stable\"` argsort preserves mergesort tie order. Prior fast-path commit 25f6d508 is ancestor; this is 9b41e16e on top."
+  }
+}

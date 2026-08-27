@@ -1,0 +1,34 @@
+# Lessons inbox (v1: in-repo, tamper-evident via git history)
+
+Append-only capture substrate for the reflow pipeline. Claude appends a line the
+moment a lesson surfaces (model captures, near-zero human friction); the human
+prunes at session close (the quality gate). **Deletion is tombstone, not erase** —
+strike the line through and move it to `## Tombstone` with a reason; git history is
+the tamper-evidence (a committed line cannot be silently rewritten without the diff
+showing). Recurrence = grep by `root_cause_id`, including tombstones.
+
+> **v1 scope (D5, walked back per grok RP-1):** the inbox is **in the alpha-court
+> repo**, not a global `~/.claude` file — a global file is not a git repo, so its
+> tombstones aren't tamper-evident. It promotes to a dedicated versioned reflow
+> repo when project #2 appears (don't build cross-project machinery before it
+> exists — D3 anti-overfitting, applied to the tool itself).
+
+Line format: `[YYYY-MM-DD][attribution][root_cause_id?][form?: hook/skill/memory] lesson · evidence:<pointer>`
+
+## Open
+
+- `[2026-07-11][framework-fault][framework-design-without-enforcement][hook] grok RP-1 caught the v0 framework as an empty-shelves prescription; landed teeth this session · evidence:CR-06 · PROMOTED → CR-06`
+- `[2026-07-12][framework-fault][?gate-satisfied-by-unrelated-artifact][skill] skill-review-gate returned PASS for two NEW skills (data-pipeline-hygiene, research-session-protocol) on the strength of the UNRELATED case-study RP-1 review co-present in main..HEAD — co-presence is RANGE-scoped, so batching a skill with any meta-reviews/* change passes; the gate cannot tell WHICH skill a review covers (substance = RP-1's job by design, D1). Caught by RUNNING the gate, not assuming its PASS. Lesson is interpretive: a green gate is necessary-not-sufficient; it is NOT review-clearance for a skill. · evidence:commit d1a9fe0 gate PASS citing case-study-review-*.json as "review" · NEEDS: id-assignment via frozen-vocab RP-1; do NOT merge these two skills to main on this PASS`
+  - **RESOLVED 2026-07-12**: gate tightened — for each ADDED/MODIFIED skill it now requires the skill's `<name>` to appear **word-bounded** in a review's **added** lines (not range-level co-presence). An unrelated / co-present review no longer satisfies it; a stale review dragged in by a no-op touch no longer vouches; deletions need no review. `scripts/skill-review-gate.sh` + `tests/test_skill_review_gate.py` (8 tests, incl. the exact unrelated-review case as a red). Bypass set enumerated by a 2-lens workflow first (surfaced substring `research`⊂`research-session-protocol`, stale-touch, omnibus). Residual **stated** limits: common-word skill names, an omnibus review that incidentally lists the name, and active-faking (paste the name) — verifying a review is *about* the skill stays RP-1's/human's job (the CR-08 substance ceiling).
+
+- `[2026-07-19][referee-fault][?diagnosis-asserted-not-reproduced][ticket] rework-02 FIX-C wrote the crash mechanism into the frozen ticket as fact ("β=0 NaN row fed into errorbar") without reproducing it; referee real-input probe showed NaN does NOT trip this matplotlib — the true trigger was float-noise negative yerr (hat−lo = −2.2e-17 at strength 1.5: p̂=0 Wilson lo keeps a +2e-17 tail, 0−ε goes negative). No worker harm only because the same ticket happened to mandate clip-at-0 "for float-noise safety", which covers the true mechanism; the worker's deviation report ("matplotlib did not raise on NaN pre-fix") was adjudicated TRUE. Lesson: a verbatim traceback is evidence; an unreproduced causal mechanism written into a frozen contract is fabrication-shaped — same family as CR-03, one layer up (ticket, not spot-check). · evidence: referee probe 2026-07-19 (05 Answer addendum), rework-02.md FIX-C wording vs probe output · NEEDS: id-assignment via frozen-vocab RP-1 (candidate: diagnosis-asserted-not-reproduced)`
+  - **RESOLVED 2026-07-20**: RP-1 (rp1-resume-tooth) ruled the candidate id a **respell** of `referee-fabricated-spotcheck` ("layer-split is exactly the recurrence-laundering move the freeze rule forbids") → occurrences=3, booked as CR-15 with the standing rule: mechanism claims in frozen tickets carry repro evidence or the label HYPOTHESIS.
+
+- `[2026-07-20][contract-fault][?acceptance-preflight-missing][acceptance] 880-arm/31h sweep launched with beta_t_icir_targets=(4.0,3.0) while the frozen β* table (c987a5b9) had no 3.0 key, and with a matched-β search floor (0.05) that the commander's own β-grid re-centering (0.002..0.030) had made certainly-clamping — neither asserted before burn. Cost: t3.0 row (160 arms) uninformative + matched arms pseudo-drops → full appendix re-run (320 arms/21.5h). Named as top-criticism #2 by the v0.2 role-reversal review ("prose contract-secondary is not a re-runnable guard"). Mechanized same day: tests/test_acceptance_preflight.py (2 tests; historically red at c987a5b9 — missing=[3.0] verified). · evidence: 05 Answer 2026-07-19/20; APPENDIX-RERUN.md; meta-review-commander-v02 · NEEDS: id-assignment via frozen-vocab RP-1 (candidate: acceptance-preflight-missing)`
+  - **RESOLVED 2026-07-20**: RP-1 ruled **genuinely new** → `acceptance-preflight-missing` landed in the frozen vocab; the mechanized guard (tests/test_acceptance_preflight.py) was itself externally reviewed same round (non-vacuous, historical red independently confirmed; defaults-scope stated in its docstring).
+- `[2026-07-20][framework-fault][?publish-rules-blind-to-new-carriers][publish] v0.2 publish pre-flight: audit PASS but the independent byte-grep backstop caught two rule-外 carriers — (a) worker receipts quoting `git show` output leak the author identity line (qq email; never seen in v0.1 because receipts didn't quote git metadata), (b) flattened scratchpad paths (`-Users-<user>-…`, slashes→dashes) evade the literal home-path rule. Both fed back into publish-rules ([rewrite]+[hard-via-LHS], incl. exact-case forms — export rewrite is literal-exact while audit matching is casefold, a two-layer semantic gap also worth remembering). SpenSir123 adjudicated NOT a leak (deliberate public identity: LICENSE + fixed push identity). Lesson: every new artifact CLASS entering the tree (receipts quoting VCS metadata, path-mangled logs) is a new carrier class the rules have never seen — the byte-grep backstop is load-bearing, not ceremonial. · evidence: export-v02 rounds 1-3 (grep counts 1→1→0), publish-rules.txt 2026-07-20 entries · NEEDS: id-assignment via frozen-vocab RP-1; candidate enum vectors for the publish enum doc`
+  - **RESOLVED 2026-07-20 (id)**: RP-1 ruled **genuinely new** → `publish-rules-blind-to-new-carriers` landed in the frozen vocab. The carrier-inventory enum vectors remain open for the next publish-enum revision.
+
+## Tombstone
+
+_(none yet — when a line is pruned as noise, it moves here struck-through with a reason, never deleted)_

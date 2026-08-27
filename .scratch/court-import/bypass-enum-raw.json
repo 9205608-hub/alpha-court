@@ -1,0 +1,634 @@
+{
+  "summary": "Enumerate bypass vectors for a static AST allowlist gate on court/ imports",
+  "agentCount": 4,
+  "logs": [],
+  "result": [
+    {
+      "lens": "import-form",
+      "vectors": [
+        {
+          "id": "V01",
+          "kind": "declared-limit",
+          "severity": "blocker",
+          "vector": "court can be coupled to the market with zero import — a qlib calendar / A-share price-limit object is passed in as a duck-typed parameter to judge()/evaluate(), so there is no import node to see.",
+          "example": "# court/judge.py — no forbidden import anywhere\ndef judge(app, *, calendar=None, price_limit=None):\n    # 'calendar' is a qlib Cal object handed in by the caller;\n    # court now silently assumes A-share trading-day semantics\n    ann = calendar.trading_days_per_year() if calendar else 252\n    return _rule(app, ann, price_limit)",
+          "red_test": "A test constructs a fake market object, calls judge(app, calendar=fake), and shows the AST gate PASSES the file (no import) while court's numeric output depends on injected market semantics — documents that import-decoupling != semantic-decoupling; the gate must not be sold as covering this.",
+          "example_note": ""
+        },
+        {
+          "id": "V02",
+          "kind": "false-flag",
+          "severity": "blocker",
+          "vector": "Checking the full dotted module string against sys.stdlib_module_names (instead of reducing to split('.')[0]) red-lights REAL existing court imports — 'collections.abc' and 'scipy.stats' are not in stdlib_module_names, only their top-level names are.",
+          "example": "# court/ledger.py (already present) and court/tstats.py (already present)\nfrom collections.abc import Sequence   # top-level 'collections' IS stdlib\nfrom scipy.stats import norm           # top-level 'scipy' IS allowlisted\nimport os.path                         # top-level 'os' IS stdlib",
+          "red_test": "Red test runs the gate over the current clean court/ tree and asserts ZERO violations; a full-name (non-reduced) collector FAILS it by flagging collections.abc / scipy.stats / os.path. Locks in top-level reduction. A gate that barks on the clean tree on day one gets disabled.",
+          "example_note": ""
+        },
+        {
+          "id": "V03",
+          "kind": "bypass",
+          "severity": "blocker",
+          "vector": "A non-recursive file glob 'court/*.py' never parses market imports living in a court/ SUBpackage; anything under court/adapters/, court/_vendor/, court/qlib_shim/ is skipped entirely.",
+          "example": "# court/_vendor/feed.py  (new subpackage file, never globbed by court/*.py)\nimport qlib                       # raw market import, completely unscanned\nfrom qlib.data import D",
+          "red_test": "Red test creates court/sub/mod.py containing 'import qlib', runs the gate, asserts it is FLAGGED. A gate using glob('court/*.py') / listdir passes silently (fails the test); glob('court/**/*.py', recursive=True) or os.walk catches it.",
+          "example_note": ""
+        },
+        {
+          "id": "V04",
+          "kind": "bypass",
+          "severity": "major",
+          "vector": "Relative ImportFrom escaping the package: a collector that treats every level>=1 import as 'court-internal, allow', or that keys only on node.module (which is None for 'from .. import adapters'), lets market code in via '..'.",
+          "example": "# court/judge.py\nfrom ..adapters import qlib_cn as cal   # level=2, module='adapters' -> resolves to top-level 'adapters'\nfrom .. import adapters                  # level=2, module=None -> name is in node.names, not node.module",
+          "red_test": "Red test plants both lines and asserts FLAGGED. Correct resolver: eff = 'court'.split('.')[:-(level-1)] then join with node.module; level>=2 -> top-level 'adapters' -> violation; and for module=None it MUST inspect node.names. A collector reading only node.module (skipping None) or auto-allowing relatives fails. (Note: from top-level court, level>=2 also raises at runtime, but the static gate + any non-top-level embedding must still catch it.)",
+          "example_note": ""
+        },
+        {
+          "id": "V05",
+          "kind": "bypass",
+          "severity": "major",
+          "vector": "Imports nested in a function body, method, class body, 'if TYPE_CHECKING:', or 'try: import X except ImportError:' are invisible to a module-scope-only collector (for node in tree.body) — only ast.walk sees them.",
+          "example": "# court/noise.py\nif TYPE_CHECKING:\n    import qlib                       # type-only coupling still coupling\ndef _resolve():\n    import baostock                   # lazy import in a function\ntry:\n    import tushare\nexcept ImportError:\n    tushare = None",
+          "red_test": "Red test plants each nesting (function, method, class body, TYPE_CHECKING block, try/except ImportError, and inside 'if cond:'/'with'/'for') and asserts every one is FLAGGED. Guards against regression from ast.walk(tree) back to tree.body-only iteration.",
+          "example_note": ""
+        },
+        {
+          "id": "V06",
+          "kind": "bypass",
+          "severity": "major",
+          "vector": "Aliased/rebound dynamic import defeats a string-arg inspector that matches the literal spelling 'importlib.import_module' or '__import__': aliasing to a bare Name call or rebinding the importlib receiver hides the call shape.",
+          "example": "# court/ledger.py\nfrom importlib import import_module as imp\nimp(\"akshare\")                       # func is Name('imp'), not Attribute('import_module')\nil = importlib\nil.import_module(\"baostock\")          # receiver rebound from 'importlib' to 'il'\ngetattr(importlib, \"import_module\")(\"qlib\")",
+          "red_test": "Red test plants imp(\"akshare\") and il.import_module(\"baostock\") and asserts FLAGGED. A matcher keyed on receiver=='importlib' misses both; a robust matcher keys on the attribute/func NAME ('import_module','__import__') regardless of receiver AND tracks 'import X as alias' rebindings. Documents which spellings the string inspector actually covers.",
+          "example_note": ""
+        },
+        {
+          "id": "V07",
+          "kind": "declared-limit",
+          "severity": "major",
+          "vector": "A non-literal argument to importlib.import_module/__import__ is unrecoverable by string inspection — variable, concatenation, os.environ/config lookup, f-string, or attribute access is not an ast.Constant.",
+          "example": "# court/judge.py\nimportlib.import_module(os.environ[\"COURT_ENGINE\"])   # value at runtime only\nname = \"q\" + \"lib\"; __import__(name)                    # Name, not Constant\nimportlib.import_module(f\"{_cfg['pkg']}\")               # JoinedStr",
+          "red_test": "Red test documents the ceiling: the gate may catch the trivial constant-fold '\\\"q\\\"+\\\"lib\\\"' if it evaluates BinOps, but asserts it CANNOT flag import_module(os.environ[...]) — the module name never exists as a literal. Shows string inspection buys only literal args; the runtime-name channel is out of AST scope.",
+          "example_note": ""
+        },
+        {
+          "id": "V08",
+          "kind": "declared-limit",
+          "severity": "major",
+          "vector": "exec/eval/compile of an import string smuggles a market import inside a string literal the gate does not re-parse.",
+          "example": "# court/noise.py\nexec(\"import qlib as _q\")\nexec(\"from adapters.qlib_cn import calendar\", globals())",
+          "red_test": "Red test plants exec(\"import qlib\") and shows the gate PASSES the file (it does not descend into string bodies of exec/eval/compile). Documents the limit; optionally the gate could flag any exec/eval call in court/ as a coarse heuristic, which the test can pin as a policy choice.",
+          "example_note": ""
+        },
+        {
+          "id": "V09",
+          "kind": "declared-limit",
+          "severity": "major",
+          "vector": "Market coupling with no import at all: hardcoded market constants/semantics baked into court numerics — trading-day count, A-share daily price limit, CN holiday calendar, or a 'if market==CN' branch.",
+          "example": "# court/sharpe.py\nTRADING_DAYS = 252            # A-share/US assumption hardwired into annualization\nPRICE_LIMIT = 0.10           # China 10% daily limit leaking into a court statistic\ndef sharpe_ratio(r): return r.mean()/r.std()*np.sqrt(TRADING_DAYS)",
+          "red_test": "Red test shows the gate PASSES a court file whose Sharpe hardcodes 252 / a 10% price limit — pure market coupling, zero import. Documents that the annualization-factor trap (the repo's own reuse concern) is structurally outside an import gate; needs a separate constant/semantics review.",
+          "example_note": ""
+        },
+        {
+          "id": "V10",
+          "kind": "declared-limit",
+          "severity": "minor",
+          "vector": "String/forward-reference type annotations reference market types without importing them, so court's public interface is market-typed but no import node exists.",
+          "example": "# court/judge.py\ndef judge(app, calendar: \"qlib.data.Cal\" = None):   # string annotation, qlib never imported\n    ...\n# def evaluate(feed: 'baostock.Feed'): ...",
+          "red_test": "Red test plants a quoted 'qlib.data.Cal' annotation with no matching import and asserts the gate PASSES (annotation strings are not imports). Complements V05: TYPE_CHECKING catches an actual import; a bare string annotation evades even that.",
+          "example_note": ""
+        },
+        {
+          "id": "V11",
+          "kind": "false-flag",
+          "severity": "major",
+          "vector": "An over-broad rule that flags ALL relative imports (to be safe against 'from ..') cries wolf on legit intra-court relatives — 'from . import sharpe' / 'from .sharpe import x' (level=1) resolve to court.* and must pass.",
+          "example": "# court/dsr.py  (legit refactor to relative intra-package imports)\nfrom . import sharpe\nfrom .sharpe import _psr_details",
+          "red_test": "Red test asserts 'from . import sharpe' and 'from .sharpe import _psr_details' PASS (level=1 -> effective package 'court' -> allowed), while V04's level>=2 escapes still FLAG. Locks the boundary between allowed level-1 and forbidden level>=2; a blanket 'no relative imports' gate fails this.",
+          "example_note": ""
+        },
+        {
+          "id": "V12",
+          "kind": "false-flag",
+          "severity": "minor",
+          "vector": "The numpy+scipy-only allowlist barks on benign, non-market third-party deps (typing_extensions, numba, a stdlib backport), pressuring maintainers to disable the gate rather than curate the allowlist.",
+          "example": "# court/tstats.py\nfrom typing_extensions import Self     # non-market, harmless, but not on the 4-name allowlist",
+          "red_test": "Red test flags typing_extensions and forces a decision: the allowlist must be a single reviewed, editable constant (adding a dep = a conscious one-line allowlist edit + justification), not a hardcoded {numpy,scipy} literal buried in the walker. Documents the ergonomics so the gate is curated, not bypassed wholesale.",
+          "example_note": ""
+        },
+        {
+          "id": "V13",
+          "kind": "bypass",
+          "severity": "minor",
+          "vector": "Prefix/substring allowlist matching (name.startswith('numpy'/'court') or 'court' in name) admits look-alike market modules.",
+          "example": "# court/ledger.py\nimport numpy_cn_feed        # startswith('numpy') -> wrongly allowed\nimport court_market_shim    # 'court' in name / startswith('court') -> wrongly allowed\nimport scipyx",
+          "red_test": "Red test plants 'import numpy_cn_feed' and 'import court_market_shim' and asserts FLAGGED. Passes only if the allowlist uses exact set membership on the reduced top-level name (top in ALLOW), not startswith/substring. Cheap to include; catches a common lazy matcher.",
+          "example_note": ""
+        },
+        {
+          "id": "V14",
+          "kind": "bypass",
+          "severity": "minor",
+          "vector": "Import via builtins/vars/getattr indirection sidesteps a matcher that only recognizes the __import__(...) and importlib.import_module(...) call shapes.",
+          "example": "# court/noise.py\ngetattr(__builtins__, \"__import__\")(\"qlib\")\nvars(importlib)[\"import_module\"](\"baostock\")\nglobals()[\"__builtins__\"][\"__import__\"](\"tushare\")",
+          "red_test": "Red test plants getattr(__builtins__,'__import__')('qlib') and asserts the result: either the gate FLAGS it (if it heuristically bars getattr/vars/globals-based dynamic import in court/) or the test documents it as an accepted blind spot. Marks the outer edge of AST call-shape recognition.",
+          "example_note": ""
+        }
+      ]
+    },
+    {
+      "lens": "allowlist-boundary",
+      "vectors": [
+        {
+          "id": "V01-relimport-escape-module",
+          "kind": "bypass",
+          "severity": "blocker",
+          "vector": "A relative import at level>=2 (from ..adapters import qlib_cn) reaches the sibling top-level adapters package, so a gate that blanket-treats any level>0 import as court-internal leaks a market import.",
+          "example": "# court/leak.py\nfrom __future__ import annotations\nfrom ..adapters import qlib_cn  # ast: ImportFrom(module='adapters', level=2)\n",
+          "red_test": "Write the snippet to court/leak.py (position matters: __package__ must be 'court' so level=2 resolves to root+'.adapters'). Assert the gate returns a violation naming 'adapters'. A naive gate whose rule is 'level>0 => internal, PASS' fails this by passing it; the correct gate resolves absolute name = parent(level) + module and re-checks the allowlist, so court being depth-1 means every level>=2 escapes."
+        },
+        {
+          "id": "V02-relimport-escape-names-none",
+          "kind": "bypass",
+          "severity": "blocker",
+          "vector": "`from .. import adapters` has module=None with the escaping module name living in the names list, so a gate that only inspects node.module (sees None, assumes court-internal) passes a market package.",
+          "example": "# court/leak2.py\nfrom __future__ import annotations\nfrom .. import adapters  # ast: ImportFrom(module=None, level=2, names=['adapters'])\n",
+          "red_test": "Place in court/leak2.py at package position 'court'; assert a violation is flagged for 'adapters'. The trap: for `from PACKAGE import NAME` the NAME can itself be a submodule/sibling-package, and here module is None. A gate must, when level>=(depth of court within its parent), treat the imported names as the escaped modules. A gate keying only on module=None passes it -> leak."
+        },
+        {
+          "id": "V03-multi-alias-import",
+          "kind": "bypass",
+          "severity": "blocker",
+          "vector": "A single `import a, b` statement is one Import node with a list of aliases; a gate that checks only names[0] misses the second, market, name.",
+          "example": "# court/leak3.py\nimport numpy, adapters  # ast: Import(names=['numpy','adapters'])\n",
+          "red_test": "Feed `import numpy, adapters` to the gate; assert it flags 'adapters' (not silently satisfied by the leading legit 'numpy'). Also cover `import numpy.linalg, qlib.data`. The gate must iterate every alias in node.names and extract each top-level; a first-alias-only check passes this bypass."
+        },
+        {
+          "id": "V04-dotted-toplevel-falseflag",
+          "kind": "false-flag",
+          "severity": "blocker",
+          "vector": "The gate must reduce a dotted module to its top-level name before checking the allowlist; `from scipy.stats import norm` and `from collections.abc import Sequence` are NOT in stdlib_module_names/allowlist as full strings and would wrongly red-flag EVERY existing court file.",
+          "example": "# already live in court/dsr.py, tstats.py, sharpe.py, pbo.py, judge.py, ledger.py:\nfrom scipy.stats import norm\nfrom collections.abc import Sequence\nimport os.path\n",
+          "red_test": "Assert the gate PASSES `from scipy.stats import norm`, `from collections.abc import Sequence`, `import os.path`, `import numpy.linalg`, `from importlib import metadata`. Verified: 'scipy.stats','collections.abc','os.path' are absent from sys.stdlib_module_names while 'scipy'(dep),'collections','os' are the intended matches. THIS IS THE MOST ANNOYING false-flag: without top-level extraction the gate reds on its own repo (every court module imports scipy.stats / court.X / collections.abc) on day one and gets disabled immediately."
+        },
+        {
+          "id": "V05-type-checking-block-skip",
+          "kind": "bypass",
+          "severity": "blocker",
+          "vector": "A market import hidden inside `if TYPE_CHECKING:` slips past any gate that skips TYPE_CHECKING blocks as 'not real runtime imports'.",
+          "example": "# court/leak4.py\nfrom __future__ import annotations\nfrom typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    from adapters.qlib_cn import QlibCnConfig  # market type\n",
+          "red_test": "Plant the TYPE_CHECKING block in court/leak4.py; assert 'adapters' is flagged. The design mandates a whole-tree walk, so ast.walk sees the nested ImportFrom regardless of the `if TYPE_CHECKING` guard — this test pins that the implementer did NOT special-case/skip TYPE_CHECKING (a common 'these are type-only' shortcut) which would leak. Pair with the false-flag: `if TYPE_CHECKING: import numpy.typing as npt` must PASS."
+        },
+        {
+          "id": "V06-importlib-string-arg",
+          "kind": "bypass",
+          "severity": "major",
+          "vector": "`importlib.import_module(\"adapters.qlib_cn\")` couples to market code through a Call with a string literal, not an Import/ImportFrom node, so an import-statement-only walker never sees it — despite the design claiming the static gate 'catches importlib imports'.",
+          "example": "# court/leak5.py\nimport importlib  # legit stdlib import, PASSES\n_D = importlib.import_module(\"adapters.qlib_cn\").D  # the actual coupling\n",
+          "red_test": "Assert the gate flags court/leak5.py. This is a design-claim gap: the gate as specified resolves only Import/ImportFrom nodes, so it PASSES this (only the innocuous `import importlib` is seen). To catch it the gate must additionally inspect Call nodes for importlib.import_module / importlib.__import__ with a string-literal first arg and resolve that literal's top-level against the allowlist. Red test both proves current miss and pins the required Call-node handling for the literal-arg case."
+        },
+        {
+          "id": "V07-allowlist-prefix-leak",
+          "kind": "bypass",
+          "severity": "major",
+          "vector": "A market package named to collide by prefix (courtside, court_adapters, numpy_finance, scipylab) leaks if the allowlist uses startswith('court')/startswith('numpy') instead of exact-or-dotted matching.",
+          "example": "# court/leak6.py\nimport courtside          # third-party market lib, NOT our court package\nfrom numpy_finance import roll  # NOT numpy\nimport scipylab            # NOT scipy\n",
+          "red_test": "Assert the gate FLAGS each of `import courtside`, `from numpy_finance import x`, `import scipylab`, `import court_adapters`, `import courtmarket`. The allowlist test must be `top == 'court' or top.startswith('court.')` (dot boundary), likewise exact 'numpy'/'scipy' — NOT bare prefix. Pair with the false-flags that MUST still pass: `from court.fdr import y`, `import numpy.linalg`, `import scipy` (dot-boundary or exact are legit). A prefix check that passes courtside also wrongly frames the boundary."
+        },
+        {
+          "id": "V08-tryexcept-importerror-fallback",
+          "kind": "bypass",
+          "severity": "major",
+          "vector": "A market import placed in an `except ImportError:` fallback body slips past a gate that skips exception-handler bodies as 'optional-dependency' code.",
+          "example": "# court/leak7.py\ntry:\n    import numpy as np\nexcept ImportError:\n    import pandas as np  # market lib smuggled as the fallback\n",
+          "red_test": "Assert the gate flags 'pandas' in court/leak7.py. ast.walk descends into Try.handlers[].body, so the whole-tree walk catches it — this test pins that the implementer did not carve out try/except ImportError blocks. Pair false-flag: `try: import numpy except ImportError: np = None` (no market import) must PASS."
+        },
+        {
+          "id": "V09-from-dot-module-none-falseflag",
+          "kind": "false-flag",
+          "severity": "major",
+          "vector": "`from . import sharpe` is a legit court-internal import whose ast node has module=None; a gate doing node.module.split('.')[0] raises AttributeError and either crashes (fails the whole run) or, if wrapped to fail-open, wrongly blocks or leaks.",
+          "example": "# court/uses_sibling.py\nfrom __future__ import annotations\nfrom . import sharpe        # module=None, level=1, names=['sharpe']\nfrom .dsr import deflated_sharpe_ratio  # module='dsr', level=1\n",
+          "red_test": "Assert the gate PASSES both `from . import sharpe` and `from .dsr import x` placed in court/uses_sibling.py, and does NOT raise. Guards the module=None branch (bare `from . import name`) and level=1 same-package resolution — both are the intended internal pattern and must resolve to court without an AttributeError crash."
+        },
+        {
+          "id": "V10-legit-numpy-scipy-falseflag",
+          "kind": "false-flag",
+          "severity": "major",
+          "vector": "The core allowed third-party surface — numpy/scipy in every spelling — must pass, or the gate reds on all of court.",
+          "example": "# spellings that appear across court/*.py today:\nimport numpy as np\nfrom numpy import array\nimport numpy.linalg\nimport scipy\nfrom scipy.stats import norm, rankdata, kurtosis, skew\n",
+          "red_test": "Assert PASS for each: `import numpy as np`, `from numpy import array`, `import numpy.linalg`, `import scipy`, `from scipy.stats import norm`, plus `from __future__ import annotations` (verified in stdlib_module_names on 3.12 but list it explicitly (allowlist item b) so an older-interpreter run doesn't red every file). These are the exact live imports; any red here disables the gate."
+        },
+        {
+          "id": "V11-string-comment-not-import",
+          "kind": "false-flag",
+          "severity": "major",
+          "vector": "A market module name appearing in a comment, docstring, or string literal is not an import; a true ast gate correctly ignores it, but a regex/grep implementation would false-flag — the test pins that the gate is genuinely AST-based.",
+          "example": "# court/docs_example.py\n\"\"\"Example: downstream code does `import qlib` and `from adapters import x`.\"\"\"\nHELP = \"run: import pandas as pd\"\n# TODO: never import qlib here\n",
+          "red_test": "Assert the gate PASSES court/docs_example.py (no Import/ImportFrom nodes exist for text inside strings/comments; ast.parse never creates them). This guards against a regression to grep-based scanning, which would flag the docstring/comment mentions of qlib/adapters/pandas and cry wolf on documentation."
+        },
+        {
+          "id": "V12-lazy-import-court-in-func",
+          "kind": "false-flag",
+          "severity": "major",
+          "vector": "The live lazy `import court` inside a function body in judge.py must pass, and the gate must still walk function bodies (needed to catch hidden market imports there).",
+          "example": "# pattern from court/judge.py:155\ndef _reexport():\n    import court            # self-import, deferred to break a cycle\n    return court.__all__\n",
+          "red_test": "Two assertions: (a) `import court` nested in a function PASSES (court self-import is allowlisted item c); (b) prove the walker DOES descend into function bodies by planting `def f():\\n    from adapters import x` and asserting it is FLAGGED. Together they pin whole-tree traversal without false-flagging the real judge.py lazy self-import."
+        },
+        {
+          "id": "V13-runtime-object-injection",
+          "kind": "declared-limit",
+          "severity": "major",
+          "vector": "Market coupling via a market OBJECT passed in at runtime (a pandas DataFrame or a qlib handler handed to a court function, whose methods court then calls) requires no import and is invisible to any AST import gate.",
+          "example": "# court/judge.py — no market import, yet coupled:\ndef judge(returns):\n    arr = returns.to_pandas().values   # caller injected a market obj; .to_pandas() is market API\n    ...\n",
+          "red_test": "Document as a NOT-catchable limit: assert the gate PASSES court code that calls `.to_pandas()` / `.get_calendar()` on a parameter, because there is no Import node. Pin the boundary so it is not silently assumed covered — the runtime 'court only eats numpy return/IC series' contract is enforced by the import-time smoke test and the function signatures/tests, NOT by this static gate."
+        },
+        {
+          "id": "V14-dynamic-computed-import",
+          "kind": "declared-limit",
+          "severity": "major",
+          "vector": "`__import__(name)`, `exec(\"import \"+pkg)`, or importlib.import_module with a computed (concatenated/variable) string cannot be statically resolved — the target module name does not exist as a literal in the tree.",
+          "example": "# court/leak8.py\n_pkg = \"ada\" + \"pters\"\n_m = __import__(_pkg)                 # or: exec(f\"import {_pkg}.qlib_cn\")\n",
+          "red_test": "Document as a declared limit (distinct from V06's literal-arg case which IS catchable): assert the gate PASSES court/leak8.py because the module name is only known at runtime. Pin it so reviewers know computed-string dynamic imports are out of scope for the static gate and must be covered by the dynamic import-time smoke test / code review, not assumed caught."
+        },
+        {
+          "id": "V15-name-provenance-shadowing",
+          "kind": "declared-limit",
+          "severity": "major",
+          "vector": "The gate trusts NAMES, not provenance: a third-party market package literally distributed under a top-level name of 'court', 'numpy', or 'scipy' (or a local court/os.py shadowing stdlib os) resolves against the allowlist by name and passes, though it is market code.",
+          "example": "# court/leak9.py — allowlisted name, market payload\nimport os        # but a vendored ./os.py market shim shadows stdlib os on sys.path\nfrom court import feed  # 'court' here is a pip pkg squatting the name, not our package\n",
+          "red_test": "Document as a declared limit: assert the gate PASSES `import os` and `from court import feed` regardless of what those names actually resolve to on the path — AST does no import resolution/provenance check. Pin the boundary so the allowlist is understood as name-based; provenance is guarded by the single-source dependency pin (numpy+scipy only) and the import-time smoke test, not the AST gate."
+        },
+        {
+          "id": "V16-stdlib-version-drift",
+          "kind": "declared-limit",
+          "severity": "minor",
+          "vector": "The allowlist keys on the RUNNING interpreter's sys.stdlib_module_names, which varies by Python version, so a name (tomllib, graphlib) is allowed on one version and flagged on another — and a market shim adopting a name present in the running set's stdlib is trusted.",
+          "example": "# court/uses_tomllib.py\nimport tomllib   # in stdlib_module_names on 3.11+, ABSENT on 3.10 -> flagged there\n",
+          "red_test": "Pin the version dependency: assert that on the pinned interpreter (3.12) `import tomllib`/`import graphlib` PASS, and DOCUMENT that the gate's notion of 'stdlib' is interpreter-version-bound (fetched from sys.stdlib_module_names at run time). A dev on a different Python could see spurious flags or a shim could exploit a name that entered stdlib later; the mitigation is pinning the CI interpreter, which the gate cannot itself enforce."
+        },
+        {
+          "id": "V17-star-import-reexport",
+          "kind": "declared-limit",
+          "severity": "minor",
+          "vector": "`from numpy import *` binds names the gate cannot enumerate; if numpy (or a monkeypatched numpy) re-exported a market symbol, the module string is still the allowlisted 'numpy' so it passes.",
+          "example": "# court/leak10.py\nfrom numpy import *   # module='numpy' -> allowlisted; bound names invisible to AST\n",
+          "red_test": "Assert the legit `from numpy import *` PASSES (module is numpy) and DOCUMENT that which names it binds — and whether any is a re-exported market symbol — is not statically visible. Pin as a limit: star-imports are allowed only from numpy/scipy/court, and the risk of a re-exported market symbol is out of AST scope, covered by the dependency pin (numpy has no market re-exports) rather than the gate."
+        }
+      ]
+    },
+    {
+      "lens": "scope-carrier",
+      "vectors": [
+        {
+          "id": "scipy-submodule-topN-falseflag",
+          "vector": "Every real court file imports `from scipy.stats import norm` / `from collections.abc import Callable`; if the allowlist is matched against the FULL dotted module string instead of the top-level segment, all of them are wrongly blocked and the gate is dead on arrival.",
+          "example": "court/dsr.py:  from scipy.stats import norm\ncourt/sharpe.py:  from scipy.stats import kurtosis, norm, skew\ncourt/judge.py:  from collections.abc import Callable, Sequence",
+          "red_test": "Feed `from scipy.stats import norm` and `from collections.abc import Callable` through the checker; assert ZERO violations. A gate whose allowlist = {'numpy','scipy'} compared to node.module ('scipy.stats') flags both — the test fails until it resolves module.split('.')[0] and tests membership in sys.stdlib_module_names for the collections case.",
+          "severity": "blocker",
+          "kind": "false-flag"
+        },
+        {
+          "id": "multi-alias-import-bypass",
+          "vector": "A single `Import` node can carry several aliases; a gate that inspects only node.names[0] lets a second, un-allowlisted market name in the same statement slip past.",
+          "example": "court/leak.py:\n    from __future__ import annotations\n    import numpy as np, qlib as q   # one Import node, two aliases\n    _CAL = q.get_calendar('SH')",
+          "red_test": "Plant `import numpy, qlib` (and separately `import scipy.stats, akshare`) in a court blob; assert the gate reports a violation naming `qlib` (resp. `akshare`). A first-alias-only loop passes it — the test forces iteration over ALL node.names.",
+          "severity": "blocker",
+          "kind": "bypass"
+        },
+        {
+          "id": "nested-subpackage-no-recurse",
+          "vector": "court is flat today, but a `court/<subpkg>/*.py` added tomorrow is invisible if the gate enumerates with a non-recursive `glob('court/*.py')` instead of a recursive walk — an entire subtree of market imports goes unscanned while `from court.sub.x import ...` at the call site passes as `court.*`.",
+          "example": "court/engines/__init__.py: (empty)\ncourt/engines/cn.py:\n    from __future__ import annotations\n    import baostock as bs   # never parsed if glob is non-recursive",
+          "red_test": "Create court/engines/cn.py containing `import baostock`; run the tree scanner over court/; assert the violation is reported with path court/engines/cn.py. A `court/*.py` glob (or a hard-coded top-level file list) yields no finding — the test forces rglob/os.walk recursion into subpackages.",
+          "severity": "blocker",
+          "kind": "bypass"
+        },
+        {
+          "id": "relative-import-falseflag",
+          "vector": "The design explicitly allows relative imports within court, but `from . import sharpe` is an ImportFrom with level>0 and module=None; a gate doing `node.module.split('.')` crashes (AttributeError) or, treating None as 'not allowlisted', wrongly blocks legitimate intra-court relative imports.",
+          "example": "court/judge2.py:\n    from __future__ import annotations\n    from . import sharpe            # module is None, level=1\n    from .dsr import deflated_sharpe # module='dsr', level=1",
+          "red_test": "Feed `from . import sharpe` and `from .dsr import x` through the checker; assert ZERO violations and NO exception. A gate that dereferences node.module without a None-guard raises; one that ignores `level` treats these as unknown top-level names and false-flags. The test pins level>0 => court-internal => allowed.",
+          "severity": "blocker",
+          "kind": "false-flag"
+        },
+        {
+          "id": "copypaste-market-data",
+          "vector": "SINGLE MOST DANGEROUS CARRIER: market logic pasted verbatim into a court file as literals/functions (an A-share holiday calendar, a 10%/5% price-limit table, an index universe list) creates hard market coupling with NO import node at all — an AST import-allowlist is structurally blind to it, and it is the most likely to happen innocently.",
+          "example": "court/_cal.py:\n    from __future__ import annotations\n    # pasted from qlib SH calendar\n    A_SHARE_HOLIDAYS_2024 = ('2024-01-01','2024-02-09', ...)\n    PRICE_LIMIT = {'ST': 0.05, 'default': 0.10}\n    def is_trading_day(d): return d not in A_SHARE_HOLIDAYS_2024",
+          "red_test": "Add court/_cal.py whose only market coupling is a hard-coded holiday tuple + price-limit dict and a pure-Python helper (no imports beyond __future__); assert the import gate reports NOTHING. Documents the declared limit: this vector must be owned by the anti-pattern/copy-paste gate or human review, NOT this gate.",
+          "severity": "major",
+          "kind": "declared-limit"
+        },
+        {
+          "id": "hardcoded-market-path",
+          "vector": "Reading market data via a hard-coded filesystem path uses only stdlib open()/np.loadtxt with a string literal — no market library import — so the gate cannot see that court now depends on a qlib data layout.",
+          "example": "court/feed.py:\n    from __future__ import annotations\n    import numpy as np\n    def load_returns():\n        return np.loadtxt('/data/qlib/cn_data/calendars/day.txt')",
+          "red_test": "Add court/feed.py that opens '/data/qlib/...'; assert the import gate reports no violation (only numpy/stdlib imports present). Pins the declared limit that path-string coupling is out of scope for an import-node checker.",
+          "severity": "major",
+          "kind": "declared-limit"
+        },
+        {
+          "id": "symlinked-dir-carrier",
+          "vector": "A symlinked directory court/sub -> ../adapters makes court.sub.qlib_cn importable at runtime, but os.walk(followlinks=False) does NOT descend symlinked dirs so the target is never parsed; on the staged side git stores court/sub as a mode-120000 symlink with no .py suffix, which the `.py`-suffix filter silently drops — invisible on BOTH scan paths, while `from court.sub.qlib_cn import ...` passes as court.*.",
+          "example": "$ ln -s ../adapters court/sub\ncourt/judge3.py:\n    from __future__ import annotations\n    from court.sub.qlib_cn import get_calendar  # resolves into adapters/, live qlib coupling",
+          "red_test": "Symlink court/sub -> ../adapters, add court/judge3.py importing court.sub.qlib_cn; run tree scan and staged scan; assert BOTH flag it (either the symlinked dir or the leaking import). A followlinks=False walk + suffix-only staged filter report clean — the test forces symlink detection / fail-closed on any court/ symlink like anti_pattern_gate does for .py blobs.",
+          "severity": "major",
+          "kind": "bypass"
+        },
+        {
+          "id": "exec-market-source",
+          "vector": "exec()/eval() of a market source string executes the import at runtime with no Import/ImportFrom node for the AST to find; exec(open('adapters/cal.py').read()) or exec('import qlib') couples court while the gate sees only a Call to a builtin.",
+          "example": "court/dyn.py:\n    from __future__ import annotations\n    exec(open('adapters/qlib_cn.py').read(), globals())\n    # or: exec('import qlib as q'); CAL = q.get_calendar()",
+          "red_test": "Plant court/dyn.py with `exec('import qlib')` and one with `exec(open('adapters/qlib_cn.py').read())`; assert the gate flags them (ideally by denylisting bare exec/eval calls in court). An import-node-only gate reports clean — the test forces treating exec/eval as a denied dynamic-code carrier; residual: a computed exec string stays a declared limit.",
+          "severity": "major",
+          "kind": "bypass"
+        },
+        {
+          "id": "dynamic-importlib",
+          "vector": "importlib.import_module('qlib'), importlib.util.spec_from_file_location('m','adapters/x.py'), or __import__('baostock') import market code through a Call whose argument is a string — no Import node, so the allowlist walk never engages.",
+          "example": "court/dyn2.py:\n    from __future__ import annotations\n    import importlib\n    q = importlib.import_module('qlib')\n    m = importlib.import_module('adapters.qlib_cn')",
+          "red_test": "Plant importlib.import_module('qlib'), __import__('akshare'), and spec_from_file_location(...,'adapters/x.py'); assert the gate flags the dynamic-import call sites. Import-node-only logic misses all three — the test forces a denylist of import-by-string builtins; a computed/concatenated module name remains a declared limit.",
+          "severity": "major",
+          "kind": "bypass"
+        },
+        {
+          "id": "name-shadow-syspath",
+          "vector": "The allowlist keys on the spelling, not the resolved file: sys.path.insert(0,'adapters') then `import calendar` (a stdlib NAME) loads a market calendar shim, and `import numpy`/`import scipy` can be shadowed the same way — AST sees an allowlisted name and cannot know it now resolves to market code.",
+          "example": "court/shadow.py:\n    from __future__ import annotations\n    import sys, os\n    sys.path.insert(0, os.path.join(os.path.dirname(__file__),'..','adapters'))\n    import calendar   # adapters/calendar.py shim, not stdlib calendar",
+          "red_test": "Place adapters/calendar.py (market shim) and court/shadow.py that path-inserts then `import calendar`; assert the gate cannot distinguish it from stdlib (it passes). Pins the declared limit; a stronger gate could flag any sys.path mutation inside court/ as suspicious — assert THAT as the mitigation test.",
+          "severity": "major",
+          "kind": "declared-limit"
+        },
+        {
+          "id": "function-typechecking-import",
+          "vector": "A market import hidden in a function body, an `if TYPE_CHECKING:` block, or a `try/except ImportError:` is missed if the gate only inspects top-level tree.body instead of walking the whole AST — the design claims whole-tree, so a red test must lock it in (this is exactly the case the dynamic import-time smoke test cannot reach).",
+          "example": "court/lazy.py:\n    from __future__ import annotations\n    from typing import TYPE_CHECKING\n    if TYPE_CHECKING:\n        from adapters.qlib_cn import Cal\n    def f():\n        import qlib   # nested, runs only when called",
+          "red_test": "Plant a function-body `import qlib` and a `if TYPE_CHECKING: from adapters.qlib_cn import Cal`; assert BOTH are flagged. Also assert the legit `def _v(): import court` (judge.py:155) and a nested `import numpy` PASS. A gate iterating only module-level statements misses the qlib cases — the test forces ast.walk over the whole tree.",
+          "severity": "major",
+          "kind": "bypass"
+        },
+        {
+          "id": "conftest-runtime-inject",
+          "vector": "A repo-root conftest.py or a pytest/entry-point plugin (outside court/, so never scanned) monkeypatches market data into court's namespace at runtime — sys.modules['court.market']=adapters.qlib_cn, or court.judge._cal=qlib.get_calendar() — coupling with no import node inside any court file.",
+          "example": "conftest.py (repo root, NOT under court/):\n    import court.judge, importlib\n    court.judge._CALENDAR = importlib.import_module('adapters.qlib_cn').get_calendar()",
+          "red_test": "Add a root conftest.py that sets a court module attribute from adapters at import time; run the court/ tree scan; assert it reports nothing (conftest is outside the scanned root). Documents the declared limit: injection from files the gate does not scan is out of scope; only a runtime/import-time check on court's own namespace could catch it.",
+          "severity": "major",
+          "kind": "declared-limit"
+        },
+        {
+          "id": "future-dotted-stdlib-falseflag",
+          "vector": "Every court file opens with `from __future__ import annotations` and uses dotted stdlib (`from collections.abc import ...`, `import os.path`); an allowlist that hard-codes {numpy,scipy,court} without seeding stdlib via sys.stdlib_module_names, or that forgets __future__, cries wolf on 100% of the tree and gets disabled.",
+          "example": "court/fdr.py:  from __future__ import annotations\ncourt/judge.py:  from collections.abc import Callable, Sequence\ncourt/ledger.py:  from datetime import datetime, timezone",
+          "red_test": "Feed `from __future__ import annotations`, `from collections.abc import Callable`, `import xml.etree.ElementTree`; assert ZERO violations. Guards against an allowlist missing __future__ (it IS in sys.stdlib_module_names, so seeding from there is the fix) and against non-top-level resolution of dotted stdlib.",
+          "severity": "major",
+          "kind": "false-flag"
+        },
+        {
+          "id": "nonpy-carrier-pyx-so",
+          "vector": "A `.pyx`/`.pyi`/`.pth` file or a prebuilt `.so`/`.pyd` in court/ carries imports the `*.py`-only scan never opens; court/fast.pyx can `cimport` market code, court/judge.pyi can `from adapters import X`, and a compiled extension is fully opaque.",
+          "example": "court/fast.pyx:\n    cimport qlib_native\ncourt/judge.pyi:\n    from adapters.qlib_cn import Cal\n# plus a checked-in court/fast.cpython-312-*.so",
+          "red_test": "Add court/fast.pyx importing a market symbol and court/judge.pyi importing adapters; assert the gate (which filters to suffix=='.py') reports nothing. Pins the declared limit that non-.py source/artifacts are unscanned; a compiled .so is fundamentally beyond AST.",
+          "severity": "minor",
+          "kind": "declared-limit"
+        },
+        {
+          "id": "stdlib-version-drift",
+          "vector": "sys.stdlib_module_names is interpreter-version-specific; court requires-python>=3.10, so a legit `import tomllib` (stdlib since 3.11) is wrongly blocked when the gate runs under 3.10 CI, and vice-versa — the allowlist silently depends on which Python executes the gate.",
+          "example": "court/cfg.py:\n    from __future__ import annotations\n    import tomllib   # stdlib on 3.11+, absent from 3.10's stdlib_module_names",
+          "red_test": "Under a 3.10 interpreter, feed `import tomllib` and assert it is NOT flagged (it is genuine stdlib for court's supported range). A gate keyed purely to the runner's sys.stdlib_module_names false-flags — the test forces a version-robust stdlib set (e.g. union across supported minors, or importlib.util.find_spec fallback).",
+          "severity": "minor",
+          "kind": "false-flag"
+        }
+      ]
+    },
+    {
+      "lens": "ast-mechanics",
+      "vectors": [
+        {
+          "id": "syntaxerror-fail-open",
+          "kind": "bypass",
+          "severity": "blocker",
+          "vector": "A court file that does not parse is SKIPPED (skip==PASS), so any market import in an otherwise-unparseable file is never walked — the single most dangerous footgun.",
+          "example": "# court/x.py\nfrom adapters.qlib_cn import trading_calendar   # market import\n\ndef broken(:                                    # deliberate SyntaxError\n    pass",
+          "red_test": "In tests/test_import_gate.py plant this exact blob as a court/-scoped file (and stage it for the pre-commit path), run the gate, and assert it returns >=1 finding — either the adapters import OR a synthetic 'unparseable court/*.py = blocking' finding. A gate that does `try: tree=ast.parse(src) except SyntaxError: continue` returns 0 findings (PASS); the red test fails until an unparseable court file is fail-CLOSED."
+        },
+        {
+          "id": "parser-version-skew-py312-on-py310",
+          "kind": "bypass",
+          "severity": "blocker",
+          "vector": "Syntax valid only on the dev interpreter (3.12) but a SyntaxError on the enforcement interpreter (3.10, per requires-python>=3.10 / ruff target-version=py310) makes the file skip on exactly the stricter env, hiding a market import there.",
+          "example": "# court/x.py\ntype AlphaSeries = \"np.ndarray\"   # PEP 695, parses only on Py>=3.12\nimport qlib                        # market import",
+          "red_test": "Parse/scan the file with ast.parse(..., feature_version=(3,10)) (or under a real 3.10 interpreter — note run-gates.sh picks .venv/bin/python==3.12 OR python3 ambiguously). Assert the gate FLAGS qlib. Under fail-open the 3.10 parser SyntaxErrors on `type` and skips the whole file, concealing qlib on the CI python; the test fails until the gate pins a modern feature_version AND fails closed on any parse failure."
+        },
+        {
+          "id": "toplevel-body-not-ast-walk",
+          "kind": "bypass",
+          "severity": "blocker",
+          "vector": "Iterating only tree.body (module top level) instead of ast.walk misses imports nested in if TYPE_CHECKING, functions, classes, and try/except ImportError — the exact lazy/typing imports the dynamic smoke test also misses, which is this gate's whole reason to exist.",
+          "example": "# court/x.py\nfrom typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    from adapters.qlib_cn import QlibCalendar   # runtime smoke test never sees this\n\ndef _load():\n    import qlib                                  # lazy; not imported at `import court` time",
+          "red_test": "Plant the file with the market import nested inside `if TYPE_CHECKING:` AND inside a function body; assert BOTH are flagged. A gate looping `for node in tree.body` returns 0 findings; the red test forces `ast.walk(tree)` over the entire tree."
+        },
+        {
+          "id": "relative-import-above-court-blanket-allowed",
+          "kind": "bypass",
+          "severity": "blocker",
+          "vector": "A relative import that climbs ABOVE the court package (from ..adapters) is let through by a gate that treats every level>0 import as 'relative == within court'.",
+          "example": "# court/x.py\nfrom ..adapters import qlib_cn   # ast: module='adapters', level=2 -> resolves to top-level 'adapters'",
+          "red_test": "Place in court/x.py and assert FLAGGED. A gate with `if node.level > 0: continue  # relative = internal` returns PASS. The red test fails until level is resolved against the file's package path (court/x.py, level=2 -> parent of court -> 'adapters'), so an over-climbing relative is caught while true intra-court relatives still pass."
+        },
+        {
+          "id": "worktree-vs-staged-blob",
+          "kind": "bypass",
+          "severity": "blocker",
+          "vector": "In pre-commit, reading the WORKING TREE instead of the staged blob lets a bad import be staged then scrubbed on disk — the committed blob still carries it (candidate-B index-vs-worktree class).",
+          "example": "# staged content of court/x.py:  import qlib\n# working-tree content of court/x.py: (import removed on disk, NOT re-added)",
+          "red_test": "git add court/x.py containing `import qlib`, then rewrite the on-disk file to drop the line without re-staging. Run the staged path (must read `git show :court/x.py`, mirroring harness.anti_pattern_gate.scan_staged / _read_staged_blob). Assert FLAGGED. A gate using Path.read_text on the working tree returns PASS."
+        },
+        {
+          "id": "scope-substring-or-whole-repo-flood",
+          "kind": "false-flag",
+          "severity": "blocker",
+          "vector": "Scoping by the substring 'court' (repo root is .../alpha-court/) or walking the whole repo drags adapters/, tests/, examples/ into scope and floods findings, so the gate cries wolf and gets disabled — a de-facto total bypass.",
+          "example": "# adapters/qlib_cn.py legitimately contains:  import qlib\n# repo path .../alpha-court/  contains the substring 'court'",
+          "red_test": "Run the gate over the repo and assert it scans ONLY files whose TOP-LEVEL path component is exactly 'court' — adapters/qlib_cn.py, tests/*, harness/*, examples/* must produce ZERO findings. This mirrors the exclusion-by-path-component (not substring) rule anti_pattern_gate documents. The red test fails if the legit adapters `import qlib` is flagged."
+        },
+        {
+          "id": "non-syntaxerror-parse-exception-fail-open",
+          "kind": "bypass",
+          "severity": "major",
+          "vector": "ast.parse can raise RecursionError (deep nesting), ValueError (NUL byte in source), or MemoryError — none of which are SyntaxError, so an `except SyntaxError` skip lets them propagate/crash and an `except Exception: continue` fails open, skipping a file that also holds a market import.",
+          "example": "# court/x.py\nimport qlib\nX = [[[[[[[[[[ 0 ]]]]]]]]]]  # x25 ...  # ~200-deep literal -> ast.parse RecursionError\n# or a source blob containing a literal NUL byte -> ValueError('source code string cannot contain null bytes')",
+          "red_test": "Feed a court file that triggers RecursionError (deep nesting) and one containing a NUL byte; assert the gate is fail-CLOSED (a finding, not a skip) for BOTH. A gate catching only SyntaxError, or blanket-swallowing exceptions and continuing, is caught by asserting >=1 finding on each."
+        },
+        {
+          "id": "non-utf8-blob-fail-open",
+          "kind": "bypass",
+          "severity": "major",
+          "vector": "A staged court/*.py whose blob is not valid UTF-8 (coding cookie + high bytes) is skipped if the gate does `blob.decode('utf-8'); except UnicodeDecodeError: continue`, hiding a market import.",
+          "example": "# staged court/x.py, first line:  # -*- coding: latin-1 -*-\n# body contains byte 0xE9 (valid latin-1, invalid UTF-8) and:  import qlib",
+          "red_test": "Stage a court .py whose blob is non-UTF-8 and contains a market import; run scan_staged and assert FLAGGED (fail-closed), matching anti_pattern_gate.scan_staged's UnicodeDecodeError branch which appends a blocking Finding. A gate that `continue`s on decode error returns PASS."
+        },
+        {
+          "id": "dotted-name-full-string-match",
+          "kind": "false-flag",
+          "severity": "major",
+          "vector": "Checking the full dotted module string against {numpy, scipy} instead of the resolved TOP-LEVEL name false-flags every real court import (from scipy.stats ..., import numpy.linalg), so the gate cries wolf on legit code.",
+          "example": "# court/x.py (this is the ACTUAL pattern in dsr/sharpe/pbo/tstats)\nfrom scipy.stats import norm, kurtosis, skew   # ast module='scipy.stats'\nimport numpy.linalg                             # ast name='numpy.linalg'",
+          "red_test": "Assert the gate PASSES (0 findings) on these. A gate matching 'scipy.stats' / 'numpy.linalg' verbatim against {'numpy','scipy'} flags them (and would flag court/dsr.py, court/sharpe.py, etc.). The red test fails until the check splits on '.' and takes [0]."
+        },
+        {
+          "id": "relative-intra-court-false-flag-and-none-module",
+          "kind": "false-flag",
+          "severity": "major",
+          "vector": "Legit intra-court relatives (from .sharpe import x; from . import noise) are wrongly blocked, or crash the gate, when node.module ('sharpe' / None) is checked without resolving the relative level to court.sharpe / court.noise.",
+          "example": "# court/dsr.py-style file\nfrom .sharpe import _psr_details   # ast module='sharpe', level=1 -> court.sharpe\nfrom . import noise                # ast module=None,     level=1 -> court.noise",
+          "red_test": "Assert the gate PASSES and does NOT raise. A gate calling node.module.split('.') throws AttributeError on the module=None from-import (crash / fail-open depending on handling); a gate top-level-checking 'sharpe' finds it absent from the allowlist and false-flags it. The red test fails until relative levels resolve into the court package before the allowlist check."
+        },
+        {
+          "id": "stdlib-module-names-version-skew",
+          "kind": "false-flag",
+          "severity": "major",
+          "vector": "Building the allowlist from the LIVE interpreter's sys.stdlib_module_names makes the verdict interpreter-dependent: a name that is stdlib on 3.12 but not 3.10 (tomllib added 3.11) passes on the 3.12 dev box and is FALSE-FLAGGED on 3.10 CI (and vice-versa for removed names).",
+          "example": "# court/x.py\nimport tomllib   # in 3.12 sys.stdlib_module_names; ABSENT from 3.10's set (verified)",
+          "red_test": "Build the gate's allowlist from a monkeypatched/simulated 3.10 stdlib_module_names and assert the verdict on `import tomllib` does NOT differ from the 3.12 run. A gate keyed on `sys.stdlib_module_names` of the running interpreter flips PASS->FLAG across versions; the red test fails until the stdlib baseline is pinned (fixed set or documented max-version) so allow/deny is env-independent."
+        },
+        {
+          "id": "alias-asname-instead-of-name",
+          "kind": "bypass",
+          "severity": "major",
+          "vector": "Checking alias.asname (the bound name) instead of alias.name (the real module) lets a market lib masquerade under an allowed alias.",
+          "example": "# court/x.py\nimport qlib as np   # real module 'qlib'; bound as 'np'",
+          "red_test": "Assert FLAGGED. A gate that reads alias.asname ('np', looks allowed) instead of alias.name ('qlib') returns PASS. The red test fails until alias.name is the checked value."
+        },
+        {
+          "id": "multi-alias-single-import-node",
+          "kind": "bypass",
+          "severity": "major",
+          "vector": "A single `import a, b` node carries multiple aliases; a gate that inspects only names[0] or short-circuits on the first allowed alias misses the second (market) one.",
+          "example": "# court/x.py\nimport numpy, qlib   # one ast.Import node, aliases=[numpy, qlib]",
+          "red_test": "Assert FLAGGED. A gate checking node.names[0] only, or returning 'allowed' on the first matching alias, passes qlib. The red test fails until every alias in the node is checked."
+        },
+        {
+          "id": "court-subpackage-not-recursed",
+          "kind": "bypass",
+          "severity": "major",
+          "vector": "Globbing court/*.py (top level only) instead of court/**/*.py misses any court SUBPACKAGE, so a market import in a nested court module is never scanned.",
+          "example": "# NEW file court/backends/loader.py  (a court subpackage)\nimport baostock",
+          "red_test": "Create court/backends/loader.py with a market import and assert FLAGGED. A gate using a non-recursive court/*.py glob returns 0 findings; the red test fails until the walk recurses all court/**/*.py (and skips __pycache__/*.pyc, which are not source)."
+        },
+        {
+          "id": "dynamic-string-import-declared-limit",
+          "kind": "declared-limit",
+          "severity": "major",
+          "vector": "importlib.import_module('adapters.qlib_cn') or __import__('qlib') is a Call with a string arg, not an Import/ImportFrom node; the AST walk cannot see it, and a computed/obfuscated name is fundamentally undecidable.",
+          "example": "# court/x.py\nimport importlib\ndef _cal():\n    return importlib.import_module(\"adapters.qlib_cn\")   # no Import node\n    # or: __import__(\"qlib\"); or importlib.import_module(os.environ['MKT_MOD'])",
+          "red_test": "Assert the AST gate does NOT flag this (documented DECLARED-LIMIT) AND that a companion guard covers it — e.g. a lint banning importlib.import_module/__import__ literals inside court/, or the import-time dynamic smoke test. The red test pins the gap so no one mistakes the AST gate for complete coverage."
+        },
+        {
+          "id": "non-import-market-coupling-declared-limit",
+          "kind": "declared-limit",
+          "severity": "major",
+          "vector": "Market coupling with ZERO imports — hard-coded A-share price limits, trading-calendar dates, a fixed universe, or reading a market-data path from env — is structurally invisible to an import-AST gate.",
+          "example": "# court/x.py\nPRICE_LIMIT = 0.10                       # A-share 涨跌停\nCSI300 = [\"600000.SH\", \"000001.SZ\"]      # hard-coded universe\nCAL = open(os.environ[\"QLIB_DIR\"] + \"/calendars/day.txt\").read().split()",
+          "red_test": "Assert the import gate PASSES (no market-lib import present) and document it as a DECLARED-LIMIT: semantic market coupling stays a human/referee job. The red test fails only if the gate silently claims to have caught it; it exists to prevent over-claiming, not to catch the coupling."
+        },
+        {
+          "id": "hardcoded-dep-set-drift-friction",
+          "kind": "false-flag",
+          "severity": "minor",
+          "vector": "The allowlist hard-codes {numpy, scipy}, but court/__init__.py's own docstring and pyproject.toml already list pandas as a runtime dep — so the first legit `import pandas` false-flags, and fixing it means editing gate LOGIC, friction that invites --no-verify (or an over-broad 'sync to pyproject' that silently widens the gate).",
+          "example": "# court/x.py\nimport pandas   # court/__init__.py docstring says deps are 'numpy, pandas, and scipy'; pyproject lists pandas",
+          "red_test": "Per the pinned allowlist, assert `import pandas` in court/ is FLAGGED, AND assert the allowlist is single-sourced/documented (a named data constant, not scattered literals) so widening it is a reviewed one-line data change. The red test pins the divergence between the pinned {numpy,scipy} allowlist and the stated {numpy,pandas,scipy} dep set so the maintenance landmine is visible."
+        }
+      ]
+    }
+  ],
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Enumerate"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "enum:import-form",
+      "phaseIndex": 1,
+      "phaseTitle": "Enumerate",
+      "agentId": "a38857ceffc308e57",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1783913807997,
+      "queuedAt": 1783913807967,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "CONTEXT — repo [HOME]/Desktop/alpha-court (read court/ freely).\n\nWe are building a STATIC AST gate enforcing iron law #2: court/ (the market-agnostic validation\nkernel: DSR/PBO/BHY/empirical-null) MUST NOT import market-specific code. Market code (calendars,\nprice limits, universe defs, data feeds) lives in adapters/.\n\nDESIGN (pinned by the commander — find BYPASSES, do not relitigate):\n- …",
+      "lastProgressAt": 1783914077220,
+      "tokens": 54776,
+      "toolCalls": 5,
+      "durationMs": 269223,
+      "resultPreview": "{\"vectors\":[{\"id\":\"V01\",\"kind\":\"declared-limit\",\"severity\":\"blocker\",\"vector\":\"court can be coupled to the market with zero import — a qlib calendar / A-share price-limit object is passed in as a duck-typed parameter to judge()/evaluate(), so there is no import node to see.\",\"example\":\"# court/judge.py — no forbidden import anywhere\\ndef judge(app, *, calendar=None, price_limit=None):\\n    # 'cale…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "enum:allowlist-boundary",
+      "phaseIndex": 1,
+      "phaseTitle": "Enumerate",
+      "agentId": "a8d54cad1239e73a5",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1783913808000,
+      "queuedAt": 1783913807967,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "CONTEXT — repo [HOME]/Desktop/alpha-court (read court/ freely).\n\nWe are building a STATIC AST gate enforcing iron law #2: court/ (the market-agnostic validation\nkernel: DSR/PBO/BHY/empirical-null) MUST NOT import market-specific code. Market code (calendars,\nprice limits, universe defs, data feeds) lives in adapters/.\n\nDESIGN (pinned by the commander — find BYPASSES, do not relitigate):\n- …",
+      "lastProgressAt": 1783914064518,
+      "tokens": 51827,
+      "toolCalls": 7,
+      "durationMs": 256518,
+      "resultPreview": "{\"vectors\":[{\"id\":\"V01-relimport-escape-module\",\"kind\":\"bypass\",\"severity\":\"blocker\",\"vector\":\"A relative import at level>=2 (from ..adapters import qlib_cn) reaches the sibling top-level adapters package, so a gate that blanket-treats any level>0 import as court-internal leaks a market import.\",\"example\":\"# court/leak.py\\nfrom __future__ import annotations\\nfrom ..adapters import qlib_cn  # ast: …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "enum:scope-carrier",
+      "phaseIndex": 1,
+      "phaseTitle": "Enumerate",
+      "agentId": "acebc91467e56837d",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1783913808001,
+      "queuedAt": 1783913807967,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "CONTEXT — repo [HOME]/Desktop/alpha-court (read court/ freely).\n\nWe are building a STATIC AST gate enforcing iron law #2: court/ (the market-agnostic validation\nkernel: DSR/PBO/BHY/empirical-null) MUST NOT import market-specific code. Market code (calendars,\nprice limits, universe defs, data feeds) lives in adapters/.\n\nDESIGN (pinned by the commander — find BYPASSES, do not relitigate):\n- …",
+      "lastProgressAt": 1783914121134,
+      "tokens": 60940,
+      "toolCalls": 8,
+      "durationMs": 313133,
+      "resultPreview": "{\"vectors\":[{\"id\":\"scipy-submodule-topN-falseflag\",\"vector\":\"Every real court file imports `from scipy.stats import norm` / `from collections.abc import Callable`; if the allowlist is matched against the FULL dotted module string instead of the top-level segment, all of them are wrongly blocked and the gate is dead on arrival.\",\"example\":\"court/dsr.py:  from scipy.stats import norm\\ncourt/sharpe.p…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 4,
+      "label": "enum:ast-mechanics",
+      "phaseIndex": 1,
+      "phaseTitle": "Enumerate",
+      "agentId": "a42c3d7092542eb58",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1783913808001,
+      "queuedAt": 1783913807967,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "CONTEXT — repo [HOME]/Desktop/alpha-court (read court/ freely).\n\nWe are building a STATIC AST gate enforcing iron law #2: court/ (the market-agnostic validation\nkernel: DSR/PBO/BHY/empirical-null) MUST NOT import market-specific code. Market code (calendars,\nprice limits, universe defs, data feeds) lives in adapters/.\n\nDESIGN (pinned by the commander — find BYPASSES, do not relitigate):\n- …",
+      "lastProgressAt": 1783914158290,
+      "tokens": 62314,
+      "toolCalls": 8,
+      "durationMs": 350289,
+      "resultPreview": "{\"vectors\":[{\"id\":\"syntaxerror-fail-open\",\"kind\":\"bypass\",\"severity\":\"blocker\",\"vector\":\"A court file that does not parse is SKIPPED (skip==PASS), so any market import in an otherwise-unparseable file is never walked — the single most dangerous footgun.\",\"example\":\"# court/x.py\\nfrom adapters.qlib_cn import trading_calendar   # market import\\n\\ndef broken(:                                    # del…"
+    }
+  ],
+  "totalTokens": 229857,
+  "totalToolCalls": 28
+}

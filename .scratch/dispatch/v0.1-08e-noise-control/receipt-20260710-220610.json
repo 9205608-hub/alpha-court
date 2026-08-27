@@ -1,0 +1,60 @@
+{
+  "ticket_id": "v0.1-08e",
+  "status": "done",
+  "summary": "Added court/noise.py with NoiseResult NamedTuple and empirical_null_p implementing the Phipson & Smyth (2010) Eq. (2) add-one p-value, ties via >=, decision pass iff p_hat <= alpha (default 0.05). Fail-closed ValueError guards cover empty/non-1-D/non-finite nulls, non-finite observed, and alpha outside (0,1). Added tests/test_noise.py with the four noise-control.md §8 hand-worked vectors plus guard and boundary cases (11 tests).",
+  "branch": "dispatch/v01-08e-noise-20260710-220610",
+  "commit": "9842789826a42d0db994865aa6c9e4a7bb404e3a",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v01-08e-noise-20260710-220610",
+  "files_changed": [
+    {
+      "path": "court/noise.py",
+      "action": "added",
+      "purpose": "NoiseResult and empirical_null_p pure function for noise-control statistic"
+    },
+    {
+      "path": "tests/test_noise.py",
+      "action": "added",
+      "purpose": "§8 hand-worked vectors, resolution floor, and fail-closed guard tests"
+    }
+  ],
+  "self_test": [
+    {
+      "cmd": "python3 -m venv .venv && .venv/bin/python -m pip install -e \".[dev]\"",
+      "exit_code": 0,
+      "output_tail": "Successfully installed alpha-court-0.1.0.dev0 ... pytest-9.1.1 ... ruff-0.15.21 scipy-1.18.0 six-1.17.0"
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest tests/test_noise.py -v",
+      "exit_code": 0,
+      "output_tail": "tests/test_noise.py::test_accepts_list_and_ndarray PASSED [100%]\n============================== 11 passed in 0.06s =============================="
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest",
+      "exit_code": 0,
+      "output_tail": "tests/test_noise.py ........... [ 84%]\ntests/test_smoke.py .. [100%]\n============================== 13 passed in 0.07s =============================="
+    },
+    {
+      "cmd": ".venv/bin/ruff check .",
+      "exit_code": 0,
+      "output_tail": "All checks passed!"
+    },
+    {
+      "cmd": ".venv/bin/python -c \"from court.noise import empirical_null_p; r = empirical_null_p(2.0, [1.9, 2.0, 0.5]); assert r.p_hat == 0.5 and r.decision == 'reject' and r.n_at_least == 1, r\"",
+      "exit_code": 0,
+      "output_tail": ""
+    },
+    {
+      "cmd": "git show --stat HEAD",
+      "exit_code": 0,
+      "output_tail": " court/noise.py      | 113 ++++++++++++++++++++++++++++++++++++++++\n tests/test_noise.py | 145 ++++++++++++++++++++++++++++++++++++++++++++++++++++\n 2 files changed, 258 insertions(+)"
+    },
+    {
+      "cmd": "git status --porcelain",
+      "exit_code": 0,
+      "output_tail": ""
+    }
+  ],
+  "deviations": [],
+  "open_questions": [],
+  "notes_for_referee": "TDD: tests/test_noise.py was written first; collection failed with ModuleNotFoundError: No module named 'court.noise' before court/noise.py existed. After implement: 11 noise tests + 2 smoke green; ruff clean after auto-fix of isort I001 in the test file. No jury generation/RNG/shift code in court/noise.py. court/__init__.py untouched."
+}

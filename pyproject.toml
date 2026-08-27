@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alpha-court"
+version = "0.1.0.dev0"
+description = "Backtest frameworks tell you how well your idea did. alpha-court tells you whether to believe it."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "pandas",
+    "scipy",
+]
+
+[project.optional-dependencies]
+qlib = [
+    "pyqlib",
+]
+dev = [
+    "pytest",
+    "ruff",
+]
+demo = [
+    "matplotlib",
+]
+
+[tool.setuptools]
+packages = [
+    "court",
+    "harness",
+    "gates",
+    "adapters",
+    "examples",
+    "examples.killer_demo",
+    "examples.power_calibration",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+# .scratch/ is the verbatim evidence archive (audit scripts, worker raws) —
+# not product code; keeping it out of lint keeps `ruff check .` a product gate
+# and keeps archived artifacts unedited (CR-09).
+extend-exclude = [".scratch"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["court", "harness", "gates", "adapters", "examples"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

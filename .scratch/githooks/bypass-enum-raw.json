@@ -1,0 +1,644 @@
+{
+  "summary": "Enumerate bypass vectors for the pre-commit git-hook enforcement of two gates",
+  "agentCount": 4,
+  "logs": [],
+  "result": [
+    {
+      "lens": "hook-layer",
+      "vectors": [
+        {
+          "id": "V1-index-vs-worktree",
+          "vector": "anti_pattern_gate reads files from DISK (working tree), not the staged blob, so partial staging or a stash --keep-index lets bad code commit while the gate scans a clean worktree (false-PASS) — and the mirror case (worktree dirty-bad, index clean) false-FAILs and trains the dev to --no-verify.",
+          "example": "echo 'sharpe = rets.mean()/rets.std()*np.sqrt(252)' >> factor.py; git add factor.py; then `git checkout -- factor.py` (or edit the line clean, or `git stash --keep-index`). The INDEX blob still has the hand-rolled Sharpe; the worktree file is clean. Hook runs `python -m harness.anti_pattern_gate factor.py`, reads clean disk → PASS → the bad blob commits.",
+          "red_test": "Stage a file whose index blob carries an un-acked inline mean/std*sqrt Sharpe while the worktree copy is clean (git add, then revert the worktree line); run the pre-commit hook; assert it BLOCKS. It currently passes — the hook must scan `git show :path` / a `git checkout-index` temp, not the disk path.",
+          "severity": "blocker",
+          "preventable": "yes"
+        },
+        {
+          "id": "V2-wrapper-failopen",
+          "vector": "The pre-commit wrapper fails OPEN when a gate errors or its interpreter is missing: `gate1; gate2; exit $?` surfaces only gate2's status, a stray `|| true`, or a missing venv `python` makes the whole commit proceed silently even though enforcement is believed on.",
+          "example": "Hook body runs anti_pattern_gate then skill-review-gate.sh but does `run_gate1; run_gate2` (no `&&`, no `set -e`) → gate1's exit-1 is dropped. Or the hook calls bare `python` with no venv on PATH; on a machine where `python` is python2/absent it raises, and with `|| true` (or a non-propagated status) the commit lands.",
+          "red_test": "(a) Force anti_pattern_gate to return nonzero while skill-review-gate passes; assert the commit is BLOCKED (proves both statuses are ANDed). (b) Point the hook's interpreter at a missing binary; assert it fails CLOSED (aborts the commit), never open.",
+          "severity": "blocker",
+          "preventable": "yes"
+        },
+        {
+          "id": "V3-skillgate-head-must-be-index-tree",
+          "vector": "skill-review-gate diffs `base..head` as commit refs; at pre-commit there is no commit yet, so if the hook passes HEAD as head the currently-STAGED SKILL.md is not in the diff and the exact change being gated false-PASSes; it must diff `merge-base(main,HEAD)..$(git write-tree)`.",
+          "example": "git add .claude/skills/newskill/SKILL.md with no review staged; hook wired as `skill-review-gate.sh main HEAD`. `git diff main HEAD` does not contain the staged (uncommitted) SKILL.md, so `skill_changed` is empty → 'PASS no skill change' → the un-reviewed skill commits and FFs to main.",
+          "red_test": "Stage a brand-new SKILL.md with zero review; invoke the gate exactly as the hook will (assert the hook uses a write-tree index SHA as head, not HEAD); assert exit 1. Also assert the reversed-range guard still behaves when head is a raw tree object (merge-base --is-ancestor errors on a tree and is swallowed).",
+          "severity": "blocker",
+          "preventable": "yes"
+        },
+        {
+          "id": "V4-excluded-dir-carrier",
+          "vector": "Factor/demo code placed under any DEFAULT_EXCLUDE path component (examples/, tests/, docs/, adapters/, or ANY dot-prefixed dir) is skipped even when the hook runs and the file is staged — scan_paths drops explicitly-passed files inside excluded dirs.",
+          "example": "Confirmed live: examples/killer_demo/report.py has 3 lines the gate classes as 'hand-rolled court statistic (def)' yet they never fire because `examples` is in DEFAULT_EXCLUDE. A dev authors `examples/my_factor.py` (or tests/, docs/) with a hand-rolled Sharpe; staged, the hook exempts it silently.",
+          "red_test": "Stage examples/x.py containing an un-acked inline mean/std*sqrt Sharpe; run the hook; assert BLOCK. It currently PASSES. Decide + test whether the enforcement scope must narrow the exclude set for staged files (the demo tree is the flagship and is fully unlinted today).",
+          "severity": "major",
+          "preventable": "partial"
+        },
+        {
+          "id": "V5-notebook-carrier",
+          "vector": ".ipynb notebooks are never scanned (skipped, only counted), so committing the factor as a notebook bypasses the anti-pattern gate entirely — and factor research here is notebook-heavy (jupyter/backtest skills emit notebooks).",
+          "example": "git add research/factor.ipynb whose cell computes `equity = (1+rets).cumprod()` and a hand-rolled Sharpe. Hook passes the staged .ipynb to the gate; scan_paths increments skipped_notebooks and scans nothing → clean commit.",
+          "red_test": "Stage a .ipynb whose source contains a hand-rolled Sharpe cell; assert the hook BLOCKS (or at minimum hard-fails 'notebook not scanned, scan by hand') rather than silently passing. Document that .ipynb is an accepted carrier hole if not closed.",
+          "severity": "major",
+          "preventable": "partial"
+        },
+        {
+          "id": "V6-reuseok-string-injection",
+          "vector": "The NEW `# reuse-ok:` acknowledge, if parsed by a naive raw-line regex, is spoofable: the marker matched inside a string literal, or on a continuation line of a multi-line flagged def, grants a bogus exemption; and empty/whitespace reasons or a file-level blanket must be rejected but a loose regex accepts them.",
+          "example": "Flagged line `s = \"# reuse-ok: totally fine\"; sharpe = m()/sd()*sqrt(252)` — the trailing comment token is absent, but a `re.search(r'#\\s*reuse-ok:\\s*\\S', line)` on the raw line matches the string content → exempted. Or `def sharpe(\\n    x,\\n):  # reuse-ok: x` where the match line is the `def` line (no comment) but someone acks a continuation line.",
+          "red_test": "Assert exemption is granted ONLY when the flagged line carries a real trailing COMMENT token (tokenize) with a non-empty reason: (a) marker-inside-string → still BLOCKED; (b) `# reuse-ok:` with empty reason → BLOCKED; (c) file-level `# reuse-ok: all` at top → BLOCKED; (d) legit trailing `# reuse-ok: reuses court.sharpe pending refactor` → PASS.",
+          "severity": "major",
+          "preventable": "yes"
+        },
+        {
+          "id": "V7-cherrypick-revert-rebase-no-precommit",
+          "vector": "cherry-pick, revert, and rebase-replayed commits never invoke pre-commit, so a change can be constructed on the branch through these paths and then FF to main completely ungated — the 'skill-review-gate guards the moment before FF' claim is false for any commit not born of `git commit`.",
+          "example": "`git revert --no-edit <commit-that-deleted-a-SKILL.md>` re-ADDS the SKILL.md with no review file and no pre-commit run; the resulting commit FFs to main. Or `git cherry-pick <bad-factor-commit>` lands hand-rolled stats the gate never saw.",
+          "red_test": "Assert a NORMAL `git commit` fires the hook; then DOCUMENT (as a declared hole) that cherry-pick/revert/rebase-created commits bypass pre-commit and only server-side CI [DESIGNED] catches them — do not assert local prevention.",
+          "severity": "major",
+          "preventable": "declared-hole"
+        },
+        {
+          "id": "V8-nonff-merge-commit",
+          "vector": "A non-fast-forward merge (dev forgets --ff-only, or a conflicted merge) DOES create a commit, but a merge commit runs pre-merge-commit (which the design leaves UNWIRED), not pre-commit — so everything folded in by a real merge is ungated, the exact inverse of the pinned 'FF creates no commit' fact.",
+          "example": "`git merge feature` (without --ff-only) when histories diverged → a merge commit is created; pre-commit does not run for merge commits and pre-merge-commit is intentionally not installed → an un-reviewed skill or hand-rolled stat inside `feature` reaches the tree.",
+          "red_test": "Assert the normal single-parent `git commit` path fires; DOCUMENT that any non-ff / conflicted merge commit is an unguarded hole and that pre-merge-commit is deliberately unwired (server-side CI [DESIGNED] is the only catch).",
+          "severity": "major",
+          "preventable": "declared-hole"
+        },
+        {
+          "id": "V9-uninstalled-or-stale-worktree-MOST-LIKELY-ACCIDENTAL",
+          "vector": "MOST LIKELY ACCIDENTAL: main is local-only and work runs across many auto-spawned worktrees on branches that may predate the hook; a fresh clone or a worktree whose checkout lacks/carries a stale tracked hook dir (relative core.hooksPath) or whose branch never merged install-hooks silently no-ops, with zero 'hook missing' alarm.",
+          "example": "This repo has 7 worktrees (e.g. aegis@236074b, continue-previous-work@973fd8d) on commits that predate the hook. An agent `git worktree add`s a new branch off an old main and commits there; core.hooksPath resolves to a `scripts/githooks/pre-commit` that doesn't exist on that branch → no hook, no error, commit lands, later FFs.",
+          "red_test": "Assert that AFTER install-hooks.sh the hook fires in a fresh checkout; then DOCUMENT the hole: a checkout without the tracked hook dir, or created before install ran, is unguarded and gives no warning — flag this as the top accidental path for a worktree-heavy solo workflow.",
+          "severity": "major",
+          "preventable": "declared-hole"
+        },
+        {
+          "id": "V10-no-verify-and-c-hookspath",
+          "vector": "`git commit --no-verify`/`-n` and `git -c core.hooksPath=/dev/null commit` skip the hook outright; for a dev repeatedly told the hooks are 'advisory tripwires', `-n` becomes reflex muscle memory.",
+          "example": "`git commit -nm 'wip'` or `git -c core.hooksPath=/dev/null commit -m x`; the staged tree lands with no gate, then `git merge --ff-only` moves main to it (no commit, no second chance).",
+          "red_test": "Assert a plain `git commit` blocks on an un-acked hand-roll; DOCUMENT that `-n`/`--no-verify`/`-c core.hooksPath=...` cannot be prevented by a local hook (true enforcement = server-side CI [DESIGNED]).",
+          "severity": "major",
+          "preventable": "declared-hole"
+        },
+        {
+          "id": "V11-gui-ide-stripped-path",
+          "vector": "GUI/IDE commit clients (VS Code Git, GitHub Desktop, JetBrains with 'Run Git hooks' unchecked) may skip hooks entirely, or run them launched-from-Finder with a minimal PATH where the venv `python` is absent — combined with a fail-open wrapper (V2) the commit silently lands.",
+          "example": "Committing via the VS Code Source Control panel: the hook runs with a stripped GUI PATH, `python -m harness.anti_pattern_gate` raises 'command not found', and if the wrapper doesn't fail-closed the commit proceeds; GitHub Desktop historically skips hooks altogether.",
+          "red_test": "Assert the terminal path fires; DOCUMENT the GUI-client hole and require (ties to V2) the hook to hard-fail if its interpreter/gate is unrunnable, so a stripped-PATH GUI commit aborts instead of passing.",
+          "severity": "major",
+          "preventable": "declared-hole"
+        },
+        {
+          "id": "V12-nonexec-hook-silent-ignore",
+          "vector": "Under core.hooksPath, a hook file missing the executable bit is silently ignored by git with NO message (fail-open) — if install-hooks.sh forgets chmod +x, or the file is materialized by a tool that drops mode, enforcement is off and looks installed.",
+          "example": "`chmod -x scripts/githooks/pre-commit` (or install-hooks.sh copies the file without preserving +x) → `git commit` runs, no hook executes, no warning printed, un-acked hand-rolls commit.",
+          "red_test": "Assert an executable hook fires AND assert install-hooks.sh sets +x (and that the tracked hook has mode 100755 in the index); DOCUMENT that a de-x'd hook no-ops silently — a self-check that re-chmods or verifies the bit is the mitigation.",
+          "severity": "minor",
+          "preventable": "declared-hole"
+        },
+        {
+          "id": "V13-hookspath-unset-shared-config",
+          "vector": "core.hooksPath lives in the shared common `.git/config`, so a single `git config --unset core.hooksPath` — or any tool/agent that rewrites .git/config — disables the hook across ALL worktrees at once, quietly and globally.",
+          "example": "A helper script does `git config --unset core.hooksPath` (or a `git init`-style reset, or an IDE 'repair repository'); every one of the 7 worktrees now commits with no gate and nothing signals the change.",
+          "red_test": "Assert set→fires; DOCUMENT the single-point-of-disable (shared config) as a declared hole; optional mitigation test: install-hooks.sh is idempotent and re-asserts hooksPath, and a status check warns when it's unset.",
+          "severity": "minor",
+          "preventable": "declared-hole"
+        },
+        {
+          "id": "V14-plumbing-committree-and-apply-misbelief",
+          "vector": "Low-level plumbing writes commits with zero hook invocation: `git commit-tree` + ref update, and `git stash`'s internal commits, never touch pre-commit; also correct the commander's own list — `git apply --index` (or --cached) followed by a NORMAL `git commit` DOES fire pre-commit, so it is NOT a bypass by itself.",
+          "example": "`t=$(git write-tree); c=$(git commit-tree $t -p HEAD -m x); git update-ref refs/heads/branch $c` lands an arbitrary tree with no hook — reachable by a scripted/agentic worker. Contrast: `git apply --cached patch && git commit` still runs pre-commit (mis-listed as a skip).",
+          "red_test": "Assert the normal `git commit` path fires; DOCUMENT commit-tree/update-ref (and stash internals) as unpreventable local plumbing holes; add a regression note that `git apply --index && git commit` MUST still trigger the hook (guards against wiring that keys off how the index was populated).",
+          "severity": "minor",
+          "preventable": "declared-hole"
+        }
+      ]
+    },
+    {
+      "lens": "skill-range",
+      "vectors": [
+        {
+          "id": "SR-HEAD-DEFAULT",
+          "vector": "The hook diffs merge-base..HEAD instead of merge-base..write-tree(index), so the just-staged skill is invisible and the gate passes with no --no-verify needed.",
+          "example": "skill-review-gate.sh defaults `head=\"${2:-HEAD}\"`. At pre-commit HEAD is the PARENT of the commit being made. On a fresh branch `git diff --name-only main HEAD` is EMPTY (proven) while `git diff main $(git write-tree)` shows `.claude/skills/foo/SKILL.md`. If install-hooks passes HEAD (or forgets the write-tree arg), a brand-new un-reviewed skill sails through, then FF-merges to main unchecked.",
+          "red_test": "On a branch forked at main, stage a NEW `.claude/skills/foo/SKILL.md` with NO review and DON'T commit; invoke the hook exactly as install-hooks wires it. Assert exit!=0. A correct wiring (base=merge-base, head=`git write-tree`) bites; a head=HEAD wiring silently passes — that's the bug the red test must catch.",
+          "severity": "blocker",
+          "preventable": "yes"
+        },
+        {
+          "id": "AP-WORKTREE",
+          "vector": "The anti-pattern gate scans the WORKING TREE, not the staged blob, so staging a hand-roll while keeping a clean file on disk passes.",
+          "example": "anti_pattern_gate.py line 195 does `f.read_text(encoding=\"utf-8\")` on the filesystem path. Stage `factors/f.py` containing `def sharpe(x): return x.mean()/x.std()*(252**0.5)` (git add), then overwrite the working-tree copy with a clean stub (or `git checkout -p`). The hook reads the clean disk file → PASS → the dirty STAGED blob is what gets committed.",
+          "red_test": "Stage a blob whose `:path` content has `def sharpe(...)` but whose working-tree copy is clean; run the hook. Assert exit!=0. A correct hook feeds `git show :path` (or a temp checkout of the index) to the gate; the current path-reading gate false-passes.",
+          "severity": "blocker",
+          "preventable": "yes"
+        },
+        {
+          "id": "AP-EXCLUDED-DIR",
+          "vector": "A staged factor placed under any excluded path component is never scanned, so the hand-roll lives one directory away from enforcement.",
+          "example": "`_excluded` skips files whose parts intersect {court,adapters,tests,harness,gates,docs,examples,out,build,dist,...} OR any dot-prefixed part. Proven: the identical hand-rolled Sharpe under `examples/e.py` returns PASS while `factors/f.py` FAILs. Put the factor in `examples/`, `harness/`, or a dir named `.scratch_factors/` and the gate is blind to it.",
+          "red_test": "Stage `examples/evil.py` (or `.hidden/evil.py`) with a hand-rolled Sharpe; run the hook. Assert exit!=0, OR pin a documented decision that factor code must never live under those dirs and that the hook enforces that path constraint separately.",
+          "severity": "major",
+          "preventable": "partial"
+        },
+        {
+          "id": "AP-NONUTF8",
+          "vector": "An undecodable byte in a staged .py makes the gate skip the file (per-file fail-open), passing the commit.",
+          "example": "`scan_paths` wraps `read_text` in `except (OSError, UnicodeDecodeError): continue`. Proven: a .py holding `mean()/std()*(252**0.5)` plus a `\\xff\\xfe` byte returns PASS. A latin-1/mojibake factor file with a hand-rolled statistic is silently unscanned.",
+          "red_test": "Stage a .py with a hand-rolled Sharpe AND an invalid utf-8 byte; run the hook. Assert exit!=0 (decode failures must fail-closed or be surfaced as an error, not swallowed as a skip).",
+          "severity": "major",
+          "preventable": "yes"
+        },
+        {
+          "id": "SR-EXIT2-POLICY",
+          "vector": "When main can't be resolved (fresh clone before main exists, first commit, orphan/unrelated history) the gate exits 2 'cannot diff' and the hook's fail-open-vs-fail-closed choice is unspecified — either way it misbehaves.",
+          "example": "Proven: `skill-review-gate.sh nonexistent-main HEAD` prints 'cannot diff' and exits 2. If the hook maps exit 2 to PASS, the first skill added on a repo with no `main` ref merges un-reviewed (false-pass). If it maps to BLOCK, the bootstrap commit that creates main + a skill is wedged (false-block). Orphan branches (`git checkout --orphan`) hit the same no-merge-base path.",
+          "red_test": "In a repo where `main` does not resolve, stage a skill and run the hook. Assert the deliberately chosen policy (recommend fail-closed with a human-readable 'no main yet' message) and that exit 2 is handled distinctly from exit 1, not conflated.",
+          "severity": "major",
+          "preventable": "yes"
+        },
+        {
+          "id": "HOOK-BYPASS-CLASS",
+          "vector": "Local pre-commit is bypassable by construction — one un-verified tip commit FF-merges to main and no merge commit re-checks it.",
+          "example": "`git commit --no-verify`, a fresh clone before install-hooks ran, `git -c core.hooksPath=/dev/null commit`, or `chmod -x` on the hook. Because an FF merge creates NO commit, pre-merge-commit never fires, so a single bypassed tip commit carrying an unlinted factor or un-reviewed skill reaches main unchecked.",
+          "red_test": "DECLARED HOLE: assert the hook FIRES and blocks on the NORMAL commit path, and that the honest label ('auto-fire tripwire, true enforcement = server-side CI [DESIGNED]') is documented next to install-hooks. Do NOT assert prevention of --no-verify.",
+          "severity": "blocker",
+          "preventable": "declared-hole"
+        },
+        {
+          "id": "AP-IPYNB-NONPY",
+          "vector": "Hand-rolled statistics in a notebook or any non-.py carrier are never scanned.",
+          "example": "The gate counts but does not scan `.ipynb`, and only reads `.py`. A factor prototyped in `research.ipynb`, or in a `.pyx`/`.py.j2` template, or in a fenced code block inside a `.md`, carries the hand-rolled Sharpe past the gate untouched.",
+          "red_test": "DECLARED HOLE: stage a notebook cell with `mean/std*sqrt(252)`; assert it slips AND that the .ipynb skip is documented as an honest limit (the gate reports `skipped_notebooks`). The red test proves the hole exists and is disclosed, not that the hook prevents it.",
+          "severity": "major",
+          "preventable": "declared-hole"
+        },
+        {
+          "id": "AP-EMPTY-ARGS",
+          "vector": "A commit with no staged .py files makes the gate's argparse (nargs='+') error out, false-blocking every non-python commit.",
+          "example": "Proven: `python anti_pattern_gate.py` with no paths → argparse 'the following arguments are required: paths', exit 2. If the hook does `python -m harness.anti_pattern_gate $STAGED_PY` and STAGED_PY is empty (a docs-only or SKILL.md-only commit), the gate hard-errors and blocks a perfectly clean commit.",
+          "red_test": "Stage only a .md change (zero .py), run the hook. Assert the AP gate does NOT block the commit — the hook must short-circuit when the staged-.py list is empty.",
+          "severity": "major",
+          "preventable": "yes"
+        },
+        {
+          "id": "SR-SEPARATE-COMMITS-ORDER",
+          "vector": "Committing the SKILL first and the review in a later commit false-blocks the skill commit, imposing a non-obvious 'review-first-or-together' ordering.",
+          "example": "At the skill-only commit, base=merge-base=M and the review is not yet in the index, so `review_added` is empty and the gate FAILs (proven analog: skill staged + review absent from index → exit 1). Review-first or same-commit passes; the natural author-then-review order is blocked. A worker following 'write skill, then write its review' gets wedged mid-sequence.",
+          "red_test": "Commit `SKILL.md` alone, intending the review next. Assert the current gate blocks that intermediate commit, then decide/document the intended flow (recommend: the FAIL message instructs staging the review in the SAME commit) so the false-block is a deliberate, explained constraint.",
+          "severity": "major",
+          "preventable": "partial"
+        },
+        {
+          "id": "AP-REUSE-OK-BYPASS",
+          "vector": "The new `# reuse-ok:` acknowledgement is substance-blind (any non-empty reason exempts) and its implementation must read the ORIGINAL line because the gate blanks comments before matching.",
+          "example": "A genuine hand-roll `sharpe = m/s*sqrt(252)  # reuse-ok: legacy` is exempted regardless of truth — same paste-the-token weakness as the skill-review name match. Impl trap: `_blank_strings_and_comments` replaces comment spans with spaces before the pattern runs, so a naive exemption check on the blanked line never sees `reuse-ok` (exemption silently never fires → blocks everything). Also `# reuse-ok:` (empty), `# reuse-ok` (no colon), and a file-top blanket must NOT exempt.",
+          "red_test": "(a) DECLARED substance hole: hand-roll + `# reuse-ok: x` passes but is documented as name-only, not substantive. (b) Assert `# reuse-ok:` (empty/whitespace), `# reuse-ok` (no colon), and a file-level blanket comment do NOT exempt. (c) Assert exemption STILL works on the code line even though comments are blanked (i.e. the check reads `original[lineno-1]`, matches on the blanked line).",
+          "severity": "major",
+          "preventable": "partial"
+        },
+        {
+          "id": "SR-SUBSTANCE-BLIND",
+          "vector": "The gate only checks the skill NAME appears in a review's added lines, not that the review is about the skill.",
+          "example": "Add `SKILL.md` for `foo` plus a `.scratch/reflow/meta-reviews/x.md` whose only mention is `foo` in an unrelated sentence (or a fake review literally pasting the name; or a common-word name like `research` that any prose mentions). Gate PASSES. Also: `git commit --amend` the skill BODY after a name-only review was written — the name still matches, so a materially different skill ships past a review that never saw it.",
+          "red_test": "DECLARED HOLE (CR-08): assert a name-only/fake review passes and that the disclaimer 'checks a review REFERENCES the skill, not that it is about it — substance is RP-1's/a human's job' is documented. Do not assert the gate judges substance.",
+          "severity": "major",
+          "preventable": "declared-hole"
+        },
+        {
+          "id": "SR-PARTIAL-COMMIT-TEMPINDEX",
+          "vector": "A pathspec commit (`git commit -- <skill>`) builds from a temp index that excludes a review staged outside the pathspec, so the gate blocks; and if the hook bypasses GIT_INDEX_FILE it flips to a false-pass.",
+          "example": "Proven: during `git commit -m .. -- .claude/skills/foo/SKILL.md`, git sets GIT_INDEX_FILE to a `next-index-*.lock` temp index; `git write-tree` there sees ONLY the skill even though the review is staged in the real index. So the focused commit is FALSE-BLOCKED. Conversely, if install-hooks reads the real `.git/index` or the working tree instead of honoring GIT_INDEX_FILE, a review present in the real index but excluded from the actual commit would FALSE-PASS a skill that lands on main review-less.",
+          "red_test": "Stage skill+review, then `git commit -m x -- <skillpath>`. Assert the hook honors GIT_INDEX_FILE (uses `git write-tree`/`git diff --cached`, both of which respect the temp index) and blocks this partial commit that genuinely lacks the review — not that it reads the full real index.",
+          "severity": "minor",
+          "preventable": "partial"
+        },
+        {
+          "id": "SR-RENAME-DIR",
+          "vector": "Renaming a skill directory forces a fresh review under the NEW name even for byte-identical, already-reviewed content — a false-block, not a hole.",
+          "example": "Proven: `git mv .claude/skills/foo .claude/skills/bar` → `--name-only --diff-filter=d main HEAD` emits `.claude/skills/bar/SKILL.md` as an ADD (the delete of foo is filtered out), which the regex matches, demanding a review naming `bar`. A pure rename of a skill already reviewed as `foo` is blocked until someone archives a new review naming `bar`. (No false-pass: content edits under the rename are still caught.)",
+          "red_test": "`git mv` a reviewed skill dir with identical content and no new review; assert the gate demands a review naming the new dir. Document the intended rename workflow so this friction is deliberate.",
+          "severity": "minor",
+          "preventable": "partial"
+        },
+        {
+          "id": "SR-STALE-ALREADY-REVIEWED",
+          "vector": "A one-line edit to a skill already reviewed-and-merged on main demands a brand-new in-range review, because base=merge-base drops the prior review out of the added-lines window.",
+          "example": "Skill `foo` was reviewed and merged. Branch off main, fix a typo in `foo/SKILL.md`. `review_added` only counts reviews ADDED in merge-base..index; the historical review is in base, not added, so it doesn't count → gate FAILs. Every trivial follow-up edit re-demands a fresh archived review.",
+          "red_test": "Modify an already-merged, already-reviewed skill by one line with no new review; assert the gate blocks. Then pin the intended policy (each change needs a fresh review, OR relax to 'named in ANY review reachable from head') so the friction is a decision, not a surprise.",
+          "severity": "minor",
+          "preventable": "partial"
+        },
+        {
+          "id": "SR-REVERSED-GUARD-INERT",
+          "vector": "The gate's reversed-range guard is silently disabled in the hook wiring because head is a tree object, not a commit.",
+          "example": "Proven: invoking the gate with head=`git write-tree` (a tree) passes cleanly, and the guard `merge-base --is-ancestor \"$head\" \"$base\"` can't evaluate a tree as a commit (errors, swallowed by 2>/dev/null), so it never trips. The author's protection against a reversed base/head — a real risk if install-hooks ever computes base/head in the wrong order — does not function when head is the index tree.",
+          "red_test": "Feed the hook a deliberately reversed base/head (older head-tree, newer base) and assert it hard-fails (exit 2). Currently it will PASS 'no skill change', which is the exact silent-reversal false-pass the guard was meant to stop.",
+          "severity": "minor",
+          "preventable": "partial"
+        },
+        {
+          "id": "HOOK-WORDSPLIT-PATHS",
+          "vector": "If the hook builds the staged-file list with unquoted command substitution, paths with spaces/newlines/glob chars word-split and a factor file is silently dropped from the scan.",
+          "example": "`python -m harness.anti_pattern_gate $(git diff --cached --name-only --diff-filter=d)` splits `factors/my factor.py` into two nonexistent paths, both skipped by scan_paths → the real hand-rolled file is never scanned → PASS. A skill path with a space similarly slips the SR regex loop.",
+          "red_test": "Stage a factor file whose path contains a space and a hand-rolled Sharpe; run the hook. Assert exit!=0 (the hook must iterate NUL-delimited via `git diff -z ... | xargs -0` or a `while IFS= read -r -d ''` loop, not unquoted `$(...)`).",
+          "severity": "minor",
+          "preventable": "yes"
+        }
+      ]
+    },
+    {
+      "lens": "acknowledge",
+      "vectors": [
+        {
+          "id": "ACK-01",
+          "vector": "A `# reuse-ok:` marker sitting inside a string literal or docstring (not a real comment) exempts a genuine hand-roll on the same physical line, if the ack parser substring-matches the raw line instead of reusing tokenize to find the actual COMMENT token.",
+          "example": "note = \"# reuse-ok: n/a\"; ic = np.corrcoef(x, y)[0, 1]   # the corrcoef is live code; marker is inside the string. Docstring form: def sharpe_ratio(r):\\n    \"\"\"reuse-ok: legacy\"\"\"\\n    return r.mean()/r.std()*252**0.5",
+          "red_test": "In test_anti_pattern_gate.py plant `note = \"# reuse-ok: n/a\"; ic = np.corrcoef(x, y)[0, 1]\\n` and the docstring variant; assert _flagged(...) is STILL True. Ack must honor only a marker that tokenize classifies as a COMMENT (not STRING/FSTRING) span — the same tokenize the gate already runs for _blank_strings_and_comments. QUIETEST NEUTER: it re-opens the exact false-suppression the gate's tokenize was built to close, using the gate's own blind spot, and reads as a legit ack to a human.",
+          "severity": "blocker",
+          "preventable": "yes"
+        },
+        {
+          "id": "ACK-02",
+          "vector": "A single top-of-file / module-level blanket `# reuse-ok: everything` exempts ALL findings, if the ack scan is file-scoped (any reuse-ok line present) rather than anchored to each finding's own physical line — the design explicitly forbids this.",
+          "example": "line 1: `# reuse-ok: legacy module, all vetted`  ... line 40: `ic = np.corrcoef(x, y)[0, 1]`  (blanket at top silences the corr 39 lines below).",
+          "red_test": "File with a top-of-file blanket comment plus a corrcoef 30 lines down; assert the corrcoef is still flagged. Ack membership must be computed per-finding against original[finding.lineno-1] only, never file-wide.",
+          "severity": "blocker",
+          "preventable": "yes"
+        },
+        {
+          "id": "ACK-03",
+          "vector": "The pre-commit hook scans the WORKING TREE path instead of the staged index blob, so the ack (or a clean rewrite) can live only in the unstaged working copy while the committed blob carries the un-acked hand-roll.",
+          "example": "git add factor.py  (staged line: `sr = r.mean()/r.std()*252**0.5`), then append ` # reuse-ok: x` to factor.py WITHOUT git add; the hook runs `python -m harness.anti_pattern_gate factor.py`, reads the working file, sees the ack, PASSES; the index blob committed has no ack.",
+          "red_test": "Integration red-test: stage content A (no ack / raw hand-roll), leave working content B (ack or clean), run the hook, assert it judges the STAGED blob and FAILS — i.e. the hook must scan `git show :factor.py` (or a temp checkout of the index / `git checkout-index`), not the on-disk path.",
+          "severity": "major",
+          "preventable": "yes"
+        },
+        {
+          "id": "ACK-04",
+          "vector": "Empty or whitespace-only reason is accepted, if the marker regex allows an empty/whitespace capture group after the colon — the design says these must NOT exempt.",
+          "example": "ic = np.corrcoef(x, y)[0, 1]  # reuse-ok:   (no reason)  and  ic = np.corrcoef(x, y)[0, 1]  # reuse-ok:   \\t   (whitespace/tabs only).",
+          "red_test": "Both forms must remain flagged. Require the reason to contain `\\S` AFTER strip() (guard against a naive len(reason)>0 that counts spaces). Pin both the bare-colon and the tab-only variant.",
+          "severity": "major",
+          "preventable": "yes"
+        },
+        {
+          "id": "ACK-05",
+          "vector": "A file that does not tokenize forces _blank_strings_and_comments -> None and the naive _strip_comment_fallback; if the ack layer assumes tokenize succeeded, the whole scan runs degraded and ack can fail-OPEN (bogus marker honored, or hand-roll hidden by the weaker comment splitter).",
+          "example": "A module with an unrelated tokenize-breaker (null byte, a stray IndentationError, or Py2/`match`-era grammar) plus `ic = np.corrcoef(x,y)[0,1]  # reuse-ok:` — under fallback the string/comment boundary and the empty-reason check differ from the tokenize path.",
+          "red_test": "Feed non-tokenizable text carrying a hand-roll + a malformed/empty ack; assert the finding still BLOCKS. Ack must fail CLOSED when tokenize is unavailable (no comment-token evidence => no exemption), and the fallback degradation must be pinned.",
+          "severity": "major",
+          "preventable": "partial"
+        },
+        {
+          "id": "ACK-06",
+          "vector": "One trailing ack silences MULTIPLE distinct findings on the same physical line, because ack is applied per-line while findings are per-(line,pattern); a reason justifying one construct exempts an unrelated second one.",
+          "example": "ic = np.corrcoef(x, y)[0,1]; sr = a.mean()/a.std()*252**0.5  # reuse-ok: corr is a legit orthogonality check   (the Sharpe on the same line rides the corr's reason).",
+          "red_test": "Assert the inline-Sharpe finding on that line is NOT exempted by a reason aimed at the corr — ack should bind per-pattern, or if per-line is accepted by design, pin that as a documented weakness with a red-test that fails today.",
+          "severity": "major",
+          "preventable": "partial"
+        },
+        {
+          "id": "ACK-07",
+          "vector": "Ack over-reaches a multiline logical statement: to be 'helpful' about continuations the parser checks the whole statement/continuation range, so a reason on a trailing line exempts a real hand-roll earlier in the same statement.",
+          "example": "metrics = dict(\\n    ic=np.corrcoef(x, y)[0, 1],\\n    n=len(x),\\n)  # reuse-ok: this dict just packs scalars   (the corrcoef on the inner line is silenced by a reason about the dict).",
+          "red_test": "Assert the corrcoef inner line stays flagged. Ack must anchor to the finding's EXACT physical line (original[lineno-1]); accept + document that genuinely-multiline constructs then cannot be acked (a usability cost), rather than relaxing to a range.",
+          "severity": "major",
+          "preventable": "yes"
+        },
+        {
+          "id": "ACK-08",
+          "vector": "The hand-roll is placed where the gate never scans it, so no ack is needed at all: DEFAULT_EXCLUDE skips tests/harness/examples/docs/adapters/court by path component, and .ipynb is only counted (skipped_notebooks), not scanned.",
+          "example": "git add examples/my_factor.py containing `def sharpe_ratio(r): return r.mean()/r.std()*252**0.5`, or the identical code in research.ipynb — the pre-commit gate skips both, exemption moot.",
+          "red_test": "Assert the hook, given a staged examples/*.py or *.ipynb with a hand-roll, either scans it or LOUDLY reports the skip (notebook skip must surface in the hook output, never silently PASS). Pin that non-audited factor code must not hide under an audited-dir name.",
+          "severity": "major",
+          "preventable": "partial"
+        },
+        {
+          "id": "ACK-09",
+          "vector": "The gate cannot judge whether the reason is SUBSTANTIVE — any nonempty reason passes (garbage, 'x', 'because', or the remedy string echoed back). This is RP-1's / a human's job, not a mechanical grep's.",
+          "example": "ic = np.corrcoef(x, y)[0,1]  # reuse-ok: fine   or   # reuse-ok: court.sharpe   (echoing the remedy).",
+          "red_test": "DECLARED HOLE (CR-08 honest-limit style): a vacuous-but-nonempty reason PASSES; assert it exempts AND assert a doc/comment records the limit. Do NOT pretend the gate judges substance — pin it so no one claims otherwise.",
+          "severity": "major",
+          "preventable": "declared-hole"
+        },
+        {
+          "id": "ACK-10",
+          "vector": "The marker is matched too loosely, so a comment that merely CONTAINS the token in prose (or a ruff `# noqa` line) exempts; symmetrically, devs assume `# noqa` silences this gate.",
+          "example": "ic = np.corrcoef(x, y)[0,1]  # TODO revisit reuse-ok wiring later   (mentions the token, exempts under a substring match).",
+          "red_test": "Assert a comment merely containing `reuse-ok` in prose (no anchored `# reuse-ok: <reason>` form) does NOT exempt; require the anchored acknowledgement form. Also assert a plain `# noqa: E501` does not exempt an anti-pattern finding.",
+          "severity": "major",
+          "preventable": "yes"
+        },
+        {
+          "id": "ACK-11",
+          "vector": "The ack layer inspects the BLANKED code view (which the gate already stripped of comments) so NO ack ever works; the hard-block then has a dead escape hatch and developers route around the whole gate with `--no-verify`.",
+          "example": "ic = np.corrcoef(x, y)[0,1]  # reuse-ok: legit price-volume orthogonality   — a correct, genuine ack the gate ignores because it read the comment-blanked line instead of original.",
+          "red_test": "Positive-control red-test: assert a genuine trailing `# reuse-ok: <reason>` DOES exempt the finding, forcing the impl to read original[lineno-1], not the blanked code line. A misfire that trains wholesale bypass.",
+          "severity": "major",
+          "preventable": "yes"
+        },
+        {
+          "id": "ACK-12",
+          "vector": "Marker recognition inconsistency via casing / unicode homoglyphs — mostly fails safe (unrecognized => still blocks), but undefined casing policy plus homoglyph colons (fullwidth `：`, NBSP after `#`) make recognition unpredictable and, if the impl normalizes the whole line, can flip.",
+          "example": "ic = np.corrcoef(x,y)[0,1]  # Reuse-OK: legit   (mixed case)  and  # reuse-ok： legit   (fullwidth colon).",
+          "red_test": "Pin the exact accepted spelling; assert the homoglyph-colon and NBSP variants do NOT exempt (fail closed) and that the casing policy is explicit and tested in both directions.",
+          "severity": "minor",
+          "preventable": "yes"
+        },
+        {
+          "id": "ACK-13",
+          "vector": "A `#` inside the reason (e.g. an issue ref) is mis-parsed if the reason is extracted by str.split('#') instead of the tokenize comment span — usually fails safe (blocks) but is unpredictable and, with a first-`#` split, can truncate the reason to empty.",
+          "example": "ic = np.corrcoef(x,y)[0,1]  # reuse-ok: see bug #42, corr vetted   (a `#`-split parser garbles the reason).",
+          "red_test": "Assert this is treated as a single nonempty reason via the tokenize COMMENT-token span (parse the comment as one token, not by splitting the raw line on '#').",
+          "severity": "minor",
+          "preventable": "yes"
+        },
+        {
+          "id": "ACK-14",
+          "vector": "Local git hook is bypassable by design: `--no-verify`, a fresh clone that never ran install-hooks.sh, `git config core.hooksPath` redirected, or chmod -x on the hook. An FF merge to main creates no commit so pre-commit never fires there either.",
+          "example": "git commit --no-verify -m x  ; or on a fresh clone the tracked hooks dir is not wired until install-hooks.sh runs; or `git -c core.hooksPath=/dev/null commit`.",
+          "red_test": "DECLARED HOLE per commander: assert the hook FIRES on the NORMAL path (an un-acked hand-roll commit is rejected) AND document this hole; do NOT assert prevention of --no-verify. True enforcement = server-side CI [DESIGNED].",
+          "severity": "major",
+          "preventable": "declared-hole"
+        },
+        {
+          "id": "ACK-15",
+          "vector": "Split the inline hand-roll across lines so _sharpe_inline (needs mean+std+annualization all on ONE blanked line) no longer matches — no ack needed because nothing is flagged. A structural line-grep limit already documented in LIMITS.",
+          "example": "m = r.mean()\\ns = r.std(ddof=1)\\nsr = m / s * 252 ** 0.5   (three lines; the gate sees no single offending line).",
+          "red_test": "DECLARED LIMIT: assert the multi-line-split Sharpe is NOT flagged and pin that a line grep structurally cannot join lines — only a substantive judge (RP-1/human) catches it. Prevents a future false claim that the gate blocks hand-rolls generally.",
+          "severity": "minor",
+          "preventable": "declared-hole"
+        }
+      ]
+    },
+    {
+      "lens": "mechanics",
+      "vectors": [
+        {
+          "id": "V1-error-fail-open",
+          "vector": "When the hook body errors (python not on PATH, wrong CWD, ModuleNotFoundError, any gate crash) and the exit code isn't forced fail-closed, git treats a non-run as no-objection and the commit proceeds — enforcement silently turns OFF.",
+          "example": "A GUI/editor (VS Code Source Control, SourceTree, `git` launched from Finder) invokes the hook with a stripped PATH where `python` isn't the conda binary; `python -m harness.anti_pattern_gate` → `command not found` (exit 127). If the hook is `#!/bin/sh` without `set -e` and just lists commands, only the LAST line's status is the hook's status, so the commit with a hand-rolled `def sharpe(` sails through with no message.",
+          "red_test": "NORMAL-PATH red test: temporarily shadow `python` with a stub that exits 127 (or run the hook with an empty PATH), stage a file containing `def sharpe(`, run the pre-commit hook, assert it EXITS NON-ZERO (blocks) rather than swallowing the error. This is the most dangerous fail-open: it is silent, environment-dependent (green on the dev's shell, open in every GUI/fresh env), and leaves EVERY commit unguarded — mitigate with an explicit infra-error trap that fail-closes and prints why.",
+          "severity": "blocker",
+          "preventable": "yes"
+        },
+        {
+          "id": "V2-nonexec-silent-skip",
+          "vector": "git SILENTLY skips a hook file that isn't executable (no error, no message) — so if install-hooks.sh forgets `chmod +x`, or an editor/save/`git checkout`/rsync strips the bit, the gate never runs and the commit is unguarded.",
+          "example": "install-hooks.sh writes `.githooks/pre-commit` and sets `core.hooksPath=.githooks` but omits `chmod +x`; or a teammate edits the hook in an editor that drops the exec bit. `git commit` of a bad factor succeeds silently — git found the file but skipped it for not being executable.",
+          "red_test": "NORMAL-PATH red test: run install-hooks.sh, then `chmod -x` the hook, stage a `def sharpe(` file, commit, assert the commit is BLOCKED (i.e. installer must re-assert exec bit / verify it, and ideally a `verify-hooks` self-check refuses to report 'installed' when the bit is missing).",
+          "severity": "blocker",
+          "preventable": "yes"
+        },
+        {
+          "id": "V3-working-tree-not-staged",
+          "vector": "The anti-pattern gate has no staged mode; the obvious wrapper `python -m harness.anti_pattern_gate $(git diff --cached --name-only)` passes staged FILENAMES but the gate reads their WORKING-TREE bytes — so partial staging (`git add -p`) or stage-good-then-edit lets a bad line that is committed but not on disk-at-that-name evade, and a bad line only in the working tree falsely blocks.",
+          "example": "Stage a clean `factor.py`, then edit it to add `def sharpe(...)` WITHOUT re-staging (or `git add -p` only the innocuous hunk). The index/commit contains the clean version's name but the gate reads the dirty working file → mis-fire; the inverse (commit the bad hunk, keep working tree clean) lets the bad staged blob pass because the on-disk file is clean.",
+          "red_test": "Red test: create a repo where the STAGED blob of `factor.py` contains `def sharpe(` but the working-tree file is clean; run the hook; assert it BLOCKS (proving it reads `git show :factor.py` / a `git checkout-index` extraction, not the working file).",
+          "severity": "blocker",
+          "preventable": "yes"
+        },
+        {
+          "id": "V4-skill-gate-HEAD-offbyone",
+          "vector": "At pre-commit, HEAD is the PARENT of the pending commit, so wiring skill-review-gate as `skill-review-gate.sh main HEAD` diffs already-committed work and the newly-staged SKILL.md is invisible — the gate that is supposed to guard the pre-FF-merge moment checks nothing about the change being made.",
+          "example": "On a fresh branch off main, add `.claude/skills/foo/SKILL.md` and `git commit` with no review. `git diff main HEAD` = empty (HEAD == main's tip until the commit lands), so the gate PASSES; the un-reviewed skill is now committed and one `git merge --ff-only` from main.",
+          "red_test": "Red test: branch off main, stage a NEW `.claude/skills/foo/SKILL.md` with no naming review staged, run the pre-commit wiring, assert FAIL. This forces the hook to materialize the index (`tree=$(git write-tree)`; diff `merge-base(main,HEAD)..$tree`) instead of passing HEAD.",
+          "severity": "blocker",
+          "preventable": "yes"
+        },
+        {
+          "id": "V5-skill-gate-tree-breaks-ancestor-guard",
+          "vector": "Fixing V4 by passing the write-tree SHA as `head` feeds a TREE object into the gate's `merge-base --is-ancestor \"$head\" \"$base\"` reversed-range guard, which requires commits; it errors, `2>/dev/null` swallows it, both `&&` conditions go false, and the reversed-range protection silently no-ops for exactly the staged-index invocation the design mandates.",
+          "example": "Hook calls `skill-review-gate.sh main $(git write-tree)`. `git merge-base --is-ancestor <tree-sha> main` → fatal 'not a commit', suppressed → guard skipped. Harmless today, but the gate's own documented safety property (reject reversed ranges so a skill-add isn't read as a deletion) is now inert in the one wiring that matters.",
+          "red_test": "Red test: invoke the gate exactly as the hook will (tree SHA as head) and assert the reversed-range branch still behaves correctly (or that the hook constructs a real commit-ish); assert the gate does not silently degrade its own guard when handed a tree.",
+          "severity": "major",
+          "preventable": "yes"
+        },
+        {
+          "id": "V6-grep-nomatch-and-empty-list",
+          "vector": "`git diff --cached --name-only | grep '\\.py$'` exits 1 when no .py is staged, and the gate's argparse `nargs=\"+\"` exits 2 on an empty path list — so a naive hook either BLOCKS every doc/config-only commit (mis-fire → user reaches for --no-verify or uninstalls) or, if patched with `|| true`, swallows real failures into fail-open.",
+          "example": "Commit a README-only change: `grep '\\.py$'` returns 1; under `set -o pipefail`/`set -e` the hook aborts non-zero and blocks a totally innocent commit. The 'fix' `... || true` then also masks the gate's real exit-1 on findings.",
+          "red_test": "Two red tests: (a) commit with zero staged .py files → assert the hook PASSES (no false block); (b) commit a staged `def sharpe(` .py → assert BLOCK. A single `|| true` cannot satisfy both, forcing an explicit empty-list short-circuit that doesn't blanket-swallow the gate's status.",
+          "severity": "major",
+          "preventable": "yes"
+        },
+        {
+          "id": "V7-self-exclusion-dirs",
+          "vector": "The anti-pattern gate's DEFAULT_EXCLUDE drops files under `examples/`, `docs/`, `tests/`, `harness/`, `court/`, `adapters/`, `gates/` — so any hand-rolled statistic committed under those paths is never flagged, and factor/demo code in this repo lives under `examples/`.",
+          "example": "Commit `examples/my_factor.py` containing `def sharpe(returns): ...`. `_excluded()` sees `examples` in `path.parts` and skips the file → gate PASS. The killer-demo dir is a permanent blind spot at pre-commit.",
+          "red_test": "Red test: stage `examples/f.py` with `def sharpe(`, run the hook, assert BLOCK — forcing the pre-commit scan to use a reduced exclude set (only truly-audited `court/`,`adapters/`) rather than the advisory tool's full DEFAULT_EXCLUDE.",
+          "severity": "major",
+          "preventable": "yes"
+        },
+        {
+          "id": "V8-temp-extraction-dot-exclusion",
+          "vector": "To scan staged bytes the wrapper must extract blobs to a temp dir; but the gate's `_excluded()` also drops any path with a component starting with '.' OR in the exclude set, so if extraction preserves the repo-relative prefix (`/tmp/x/examples/f.py`) or the temp root has a dot-component, ALL extracted files are excluded and the gate returns 0 findings — a silent PASS that looks identical to 'clean'.",
+          "example": "Hook does `git checkout-index --prefix=$TMP/` (preserves `examples/`, `harness/` prefixes) or extracts into a hidden dir like `$TMP/.stage/`. Every staged file's parts hit the exclude filter or the dot rule → `scan_paths` finds nothing → hook PASSES a file full of `def sharpe(`.",
+          "red_test": "Red test: extract a `def sharpe(` blob into a temp path that mimics the wrapper's layout (dot-dir root and/or preserved excluded prefix), call the gate, assert it STILL flags — proving the wrapper flattens/relabels paths and does not inherit the exclusion by accident.",
+          "severity": "major",
+          "preventable": "yes"
+        },
+        {
+          "id": "V9-reuseok-string-injection",
+          "vector": "The new `# reuse-ok: <reason>` exemption, if implemented as a naive substring/regex over the ORIGINAL line, is defeated by putting `# reuse-ok: x` inside a string literal on a flagged line — the gate blanks comments via tokenize before matching, so the ack MUST read original lines, but original lines still contain string contents.",
+          "example": "`def sharpe(r): return \"# reuse-ok: legit\"` — the `\\bdef\\s+\\w*sharpe` pattern matches, and a substring check `'# reuse-ok:' in original_line` sees the literal inside the string → line exempted. No actual acknowledgement comment exists.",
+          "red_test": "Red test: a flagged line whose `# reuse-ok: ...` text appears only inside a string literal → assert NOT exempted (the ack must be a real trailing COMMENT token via tokenize, not a substring).",
+          "severity": "major",
+          "preventable": "yes"
+        },
+        {
+          "id": "V10-reuseok-empty-and-blanket",
+          "vector": "The exemption must reject an empty/whitespace reason and any file-level blanket, but a loose regex like `#\\s*reuse-ok:?` exempts `# reuse-ok:` with no reason, and a file/module-level `# reuse-ok: all` or a first-line pragma could be read as blanket if the matcher isn't strictly per-flagged-line with a non-empty reason.",
+          "example": "Line `def sharpe(...):  # reuse-ok:` (empty reason) slips if the regex tolerates trailing colon; or a top-of-file `# reuse-ok: everything` is honored file-wide if the implementation scans for the token anywhere in the file rather than on the exact flagged line.",
+          "red_test": "Two red tests: (a) `def sharpe(): # reuse-ok:` (empty/whitespace reason) → assert BLOCK; (b) a file-level `# reuse-ok: x` on its own line with a separate flagged `def sharpe(` line → assert the flagged line still BLOCKS (blanket doesn't exempt).",
+          "severity": "major",
+          "preventable": "yes"
+        },
+        {
+          "id": "V11-unicode-skip-fail-open",
+          "vector": "`scan_paths` swallows `UnicodeDecodeError` with `continue`, so a staged .py containing a single non-UTF-8 byte is skipped entirely and PASSES — a deliberate or accidental encoding poison hides the whole file from the gate.",
+          "example": "Add a Latin-1 byte (e.g. `\\xff`) in a comment of `factor.py` alongside `def sharpe(`. `f.read_text(encoding='utf-8')` raises UnicodeDecodeError → the file is skipped → gate PASS. (When the wrapper extracts staged bytes to temp, this triggers on the staged content too.)",
+          "red_test": "Red test: stage a file with a non-UTF-8 byte plus `def sharpe(`, run the hook, assert it does NOT silently pass (either flag or hard-error on undecodable staged .py) rather than `continue`-skipping.",
+          "severity": "major",
+          "preventable": "yes"
+        },
+        {
+          "id": "V12-word-split-nonexistent-path",
+          "vector": "Unquoted `$(git diff --cached --name-only)` word-splits on spaces and the gate silently scans nothing for a path that doesn't resolve (os.walk on a non-existent path yields nothing, no error) — so a filename containing a space, or any list-plumbing glitch, drops files from the scan with no signal.",
+          "example": "Stage `my factor.py` (space in name) with `def sharpe(`. Unquoted expansion passes `my` and `factor.py` as two args; neither exists as a file → `scan_paths` walks nothing → PASS. Same silent drop if quotepath escapes a unicode name into a non-existent literal.",
+          "red_test": "Red test: stage a `def sharpe(` file whose name contains a space, run the hook, assert BLOCK (forces NUL-delimited `-z` plumbing and quoted args, and ideally the gate erroring on a passed path that doesn't exist instead of silently walking nothing).",
+          "severity": "major",
+          "preventable": "yes"
+        },
+        {
+          "id": "V13-pipe-and-local-exit-swallow",
+          "vector": "Exit status is lost through a pipe without `pipefail`, through `local var=$(gate)` (the `local` builtin masks the command's status even under `set -e`), or through `gate | tee log` (status is tee's) — so the gate reports failure but the hook returns 0 and the commit proceeds.",
+          "example": "`local out=$(python -m harness.anti_pattern_gate ...)` — the assignment's status is `local`'s (always 0), so a non-zero gate is invisible; or `run_gate | tee /tmp/log` returns tee's 0. Commit with findings proceeds.",
+          "red_test": "Red test: stage a `def sharpe(` file with the gate's stderr piped through `tee`/captured via `local`, run the hook, assert the hook's final exit is NON-ZERO (forces explicit `${PIPESTATUS[0]}` / non-`local` capture / `set -o pipefail` with a checked status).",
+          "severity": "major",
+          "preventable": "yes"
+        },
+        {
+          "id": "V14-worktree-cwd-hookpath-crossbind",
+          "vector": "Every commit here happens in a linked worktree; if the hook resolves sibling scripts / the `harness/` package via `$0`-dir or a hard-coded main-repo path instead of the per-worktree `git rev-parse --show-toplevel`, it can run the MAIN worktree's gate against the SUB-worktree's staged files (or fail to import harness on a branch where its path differs) — scanning the wrong tree or crashing into a fail-open.",
+          "example": "`core.hooksPath` is set (shared config) to main's `.githooks`; the hook does `cd \"$(dirname \"$0\")/..\"` (→ main root) then `python -m harness.anti_pattern_gate` and `git write-tree` — but git set CWD/GIT_DIR to the sub-worktree, so `write-tree` reads the sub-worktree index while `python -m` imports main's harness and the CWD mismatch either mis-scans or ModuleNotFoundErrors.",
+          "red_test": "Red test: from a second worktree, stage a `def sharpe(` file and commit; assert BLOCK — proving the hook anchors both the python module root and the staged extraction to `git rev-parse --show-toplevel` of the committing worktree, never `$0`-dir.",
+          "severity": "major",
+          "preventable": "yes"
+        },
+        {
+          "id": "V15-install-clobber-and-hookspath-shadow",
+          "vector": "install-hooks.sh setting `core.hooksPath` makes git ignore `.git/hooks/*` entirely (so any other tool's existing hooks silently stop firing), and if it's not idempotent or overwrites a pre-existing `core.hooksPath`/hook it can clobber other tooling; because the config is in the shared common dir it flips behavior for ALL worktrees at once, including ones mid-operation.",
+          "example": "A dev already uses pre-commit-framework via `.git/hooks/pre-commit`; install-hooks.sh sets `core.hooksPath=.githooks`, and now the framework's hooks (lint/secrets) silently never run. Or running install twice appends duplicate lines / re-points hooksPath, and a partial install in one worktree changes every worktree.",
+          "red_test": "Red test: pre-seed a `core.hooksPath` (or a `.git/hooks/pre-commit`), run install-hooks.sh twice, assert it is idempotent, refuses-or-warns on an existing different hooksPath, and reports which prior hooks it is shadowing (not a silent clobber).",
+          "severity": "major",
+          "preventable": "yes"
+        },
+        {
+          "id": "V16-stale-in-range-review-vouches",
+          "vector": "skill-review-gate keys off ADDED review lines across the whole merge-base(main,HEAD)..index range, so a review added EARLIER on the same long-lived branch keeps vouching for a LATER un-reviewed re-edit of the same skill — the wide worktree range lets one stale in-range review cover a fresh change with no new review.",
+          "example": "On a branch, you legitimately add `foo/SKILL.md` plus a review naming `foo` (commit A). Later on the same branch you materially rewrite `foo/SKILL.md` (commit B) with NO new review. At B's pre-commit, base..index still contains commit A's added review line naming `foo` → gate PASSES the un-reviewed rewrite.",
+          "red_test": "Red test: build a branch history with an early review naming `foo`, then a later un-reviewed edit of `foo/SKILL.md`; run the gate over base..index, assert it FAILS the later edit (forces per-change coupling, e.g. the review must appear in the same commit/segment as the skill edit, not merely somewhere in range).",
+          "severity": "major",
+          "preventable": "partial"
+        },
+        {
+          "id": "V17-extension-rename-symlink-blind",
+          "vector": "The gate only scans `f.suffix == '.py'` and a naive `--diff-filter=ACM`, so a factor committed without a .py extension, as a renamed file (filter drops R), or as a symlink is not scanned as Python content.",
+          "example": "Commit a shebang script named `run_factor` (no extension) containing `def sharpe(`, or `git mv clean.py factor.py` where the wrapper's `--diff-filter=ACM` omits R, or stage `factor.py` as a symlink to `../evil.py` so `git show :factor.py` yields the link target string.",
+          "red_test": "Red test: stage (a) an extensionless python script and (b) a renamed-in .py, both containing `def sharpe(`, assert the hook BLOCKS both (forces extension-agnostic detection of python via shebang/`git` mode and inclusion of R/T in the diff filter).",
+          "severity": "major",
+          "preventable": "partial"
+        },
+        {
+          "id": "V18-noff-merge-unwired",
+          "vector": "A `git merge --no-ff` to main creates a MERGE commit that fires `pre-merge-commit` (not installed) and NOT `pre-commit`, so a branch merged with --no-ff bypasses both gates even though a commit is created on main — the design only reasons about --ff-only.",
+          "example": "Instead of `git merge --ff-only`, run `git merge --no-ff feature` (or a merge that can't FF): main gets a merge commit carrying an un-reviewed skill / hand-rolled Sharpe, pre-commit never fires, pre-merge-commit isn't installed.",
+          "red_test": "DECLARED-HOLE red test: assert pre-commit fires on the NORMAL direct-commit path AND document that --no-ff merges to main are only covered by pre-merge-commit (unwired) — the honest fix is server-side/CI enforcement plus optionally wiring pre-merge-commit, not claiming pre-commit covers merges.",
+          "severity": "major",
+          "preventable": "declared-hole"
+        },
+        {
+          "id": "V19-local-bypass-and-uninstalled",
+          "vector": "Local hooks are bypassable by construction — `git commit --no-verify/-n`, `core.hooksPath=/dev/null` for one command, an uninstalled fresh clone or a worktree on a branch that predates the tracked `.githooks` dir (relative hooksPath resolves per-worktree, so the dir simply isn't there) — all commit unguarded.",
+          "example": "`git commit --no-verify`; or a new worktree cut from an old branch has no `.githooks/` checked out so git finds no hook; or a teammate clones and never runs install-hooks.sh.",
+          "red_test": "DECLARED-HOLE red test: assert the hook DOES fire on a properly-installed normal commit, and document (in install-hooks.sh + PUBLISHING/README) that --no-verify, absent install, and pre-`.githooks` branches are unenforceable locally — true enforcement is server-side CI [DESIGNED]. Mitigate the fresh-clone case with a `verify-hooks` self-check surfaced loudly.",
+          "severity": "major",
+          "preventable": "declared-hole"
+        },
+        {
+          "id": "V20-skill-gate-fake-review-paste",
+          "vector": "skill-review-gate only checks that SOME added review line NAMES the skill, so at pre-commit a worker can co-stage a one-line file under .scratch/reflow/meta-reviews/ that merely contains the skill name and the gate passes — self-vouching with no real review (the gate's own documented honest limit, now trivially reachable in a single commit).",
+          "example": "In the same commit as `.claude/skills/foo/SKILL.md`, stage `.scratch/reflow/meta-reviews/x.md` whose only added line is `foo`. Range diff includes both added lines → gate PASSES with a fake review.",
+          "red_test": "DECLARED-HOLE red test: assert the gate correctly FAILS when NO review names the skill (normal path), and document that name-presence is not substance — a co-staged one-line fake passes by design; substance is RP-1's/a human's job, or a server-side check that the review file is an actual archived grok verdict.",
+          "severity": "minor",
+          "preventable": "declared-hole"
+        },
+        {
+          "id": "V21-perf-disable-and-repo-root-misfire",
+          "vector": "If the wrapper passes the repo ROOT (or a directory) to the gate instead of the staged file list, it re-walks the whole tree every commit — slow on a large tree, and it blocks commits over PRE-EXISTING hand-rolls in files the user never touched, so the noise drives the user to --no-verify or uninstall.",
+          "example": "Hook does `python -m harness.anti_pattern_gate .` — every commit rescans the entire repo (minus excludes), flags a legacy `def sharpe(` in an unrelated untouched file, and blocks an unrelated doc commit; after a few false blocks the user disables the hook.",
+          "red_test": "Red test: with a pre-existing flagged file NOT part of the current commit, commit an unrelated clean change, assert the hook PASSES (scope is staged-only), and add a large-staged-set timing budget so the gate can't become the reason someone turns it off.",
+          "severity": "minor",
+          "preventable": "partial"
+        }
+      ]
+    }
+  ],
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Enumerate"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "enum:hook-layer",
+      "phaseIndex": 1,
+      "phaseTitle": "Enumerate",
+      "agentId": "abe84ba0c214db765",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1783910671445,
+      "queuedAt": 1783910671400,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "CONTEXT — repo [HOME]/Desktop/alpha-court (you may read files there).\n\nWe are wiring TWO existing gates into a git PRE-COMMIT hook (candidate B, \"make the manual\ngates auto-fire\"). Design already pinned by the commander (do NOT relitigate scope; find\nBYPASSES of this specific design):\n\n1) anti_pattern_gate (harness/anti_pattern_gate.py): a HIGH-RECALL lint that flags hand-rolled\n   statist…",
+      "lastProgressAt": 1783911033340,
+      "tokens": 62302,
+      "toolCalls": 9,
+      "durationMs": 361894,
+      "resultPreview": "{\"vectors\":[{\"id\":\"V1-index-vs-worktree\",\"vector\":\"anti_pattern_gate reads files from DISK (working tree), not the staged blob, so partial staging or a stash --keep-index lets bad code commit while the gate scans a clean worktree (false-PASS) — and the mirror case (worktree dirty-bad, index clean) false-FAILs and trains the dev to --no-verify.\",\"example\":\"echo 'sharpe = rets.mean()/rets.std()*np.s…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "enum:skill-range",
+      "phaseIndex": 1,
+      "phaseTitle": "Enumerate",
+      "agentId": "aaa55fcaf817dfc95",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1783910671448,
+      "queuedAt": 1783910671400,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "CONTEXT — repo [HOME]/Desktop/alpha-court (you may read files there).\n\nWe are wiring TWO existing gates into a git PRE-COMMIT hook (candidate B, \"make the manual\ngates auto-fire\"). Design already pinned by the commander (do NOT relitigate scope; find\nBYPASSES of this specific design):\n\n1) anti_pattern_gate (harness/anti_pattern_gate.py): a HIGH-RECALL lint that flags hand-rolled\n   statist…",
+      "lastProgressAt": 1783911227906,
+      "tokens": 73558,
+      "toolCalls": 11,
+      "durationMs": 556458,
+      "resultPreview": "{\"vectors\":[{\"id\":\"SR-HEAD-DEFAULT\",\"vector\":\"The hook diffs merge-base..HEAD instead of merge-base..write-tree(index), so the just-staged skill is invisible and the gate passes with no --no-verify needed.\",\"example\":\"skill-review-gate.sh defaults `head=\\\"${2:-HEAD}\\\"`. At pre-commit HEAD is the PARENT of the commit being made. On a fresh branch `git diff --name-only main HEAD` is EMPTY (proven) w…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "enum:acknowledge",
+      "phaseIndex": 1,
+      "phaseTitle": "Enumerate",
+      "agentId": "a64bc1c308237093e",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1783910671449,
+      "queuedAt": 1783910671401,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "CONTEXT — repo [HOME]/Desktop/alpha-court (you may read files there).\n\nWe are wiring TWO existing gates into a git PRE-COMMIT hook (candidate B, \"make the manual\ngates auto-fire\"). Design already pinned by the commander (do NOT relitigate scope; find\nBYPASSES of this specific design):\n\n1) anti_pattern_gate (harness/anti_pattern_gate.py): a HIGH-RECALL lint that flags hand-rolled\n   statist…",
+      "lastProgressAt": 1783911002552,
+      "tokens": 66730,
+      "toolCalls": 8,
+      "durationMs": 331102,
+      "resultPreview": "{\"vectors\":[{\"id\":\"ACK-01\",\"vector\":\"A `# reuse-ok:` marker sitting inside a string literal or docstring (not a real comment) exempts a genuine hand-roll on the same physical line, if the ack parser substring-matches the raw line instead of reusing tokenize to find the actual COMMENT token.\",\"example\":\"note = \\\"# reuse-ok: n/a\\\"; ic = np.corrcoef(x, y)[0, 1]   # the corrcoef is live code; marker i…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 4,
+      "label": "enum:mechanics",
+      "phaseIndex": 1,
+      "phaseTitle": "Enumerate",
+      "agentId": "a3831dbd1cab97024",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1783910671450,
+      "queuedAt": 1783910671401,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "CONTEXT — repo [HOME]/Desktop/alpha-court (you may read files there).\n\nWe are wiring TWO existing gates into a git PRE-COMMIT hook (candidate B, \"make the manual\ngates auto-fire\"). Design already pinned by the commander (do NOT relitigate scope; find\nBYPASSES of this specific design):\n\n1) anti_pattern_gate (harness/anti_pattern_gate.py): a HIGH-RECALL lint that flags hand-rolled\n   statist…",
+      "lastProgressAt": 1783911046589,
+      "tokens": 56452,
+      "toolCalls": 11,
+      "durationMs": 375139,
+      "resultPreview": "{\"vectors\":[{\"id\":\"V1-error-fail-open\",\"vector\":\"When the hook body errors (python not on PATH, wrong CWD, ModuleNotFoundError, any gate crash) and the exit code isn't forced fail-closed, git treats a non-run as no-objection and the commit proceeds — enforcement silently turns OFF.\",\"example\":\"A GUI/editor (VS Code Source Control, SourceTree, `git` launched from Finder) invokes the hook with a str…"
+    }
+  ],
+  "totalTokens": 259042,
+  "totalToolCalls": 39
+}

@@ -1,0 +1,70 @@
+{
+  "ticket_id": "v0.2-07",
+  "status": "done",
+  "summary": "Implemented the certified-path pre-registration gate: CertifiedRun in harness/run.py (create/open, propose, evaluate with run_config conformance, single judge with mid-battery fail-closed consume, seal + run_manifest.json), pluggable anchors in harness/anchor.py (NoopAnchor, FileAnchor, GitAnchor), and harness/verify.py (invariants 1–9 raw-first replay/recompute + CLI). harness/__init__.py exports the new public surface. Tests cover the three bypasses (scope-shrink, direction flip, trace tamper), §6 honesty window, all three anchors, and CLI exit codes (36 new tests).",
+  "branch": "dispatch/v02-07-certified-run-20260716-200904",
+  "commit": "d198d109c3d6382c21645fc2d02af3141cae9dfd",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v02-07-certified-run-20260716-200904",
+  "files_changed": [
+    {
+      "path": "harness/run.py",
+      "action": "added",
+      "purpose": "CertifiedRun loop, CertificationError, seal + manifest"
+    },
+    {
+      "path": "harness/anchor.py",
+      "action": "added",
+      "purpose": "NoopAnchor, FileAnchor, GitAnchor backends"
+    },
+    {
+      "path": "harness/verify.py",
+      "action": "added",
+      "purpose": "verify() invariants 1–9, VerificationReport, CLI"
+    },
+    {
+      "path": "harness/__init__.py",
+      "action": "modified",
+      "purpose": "Export CertifiedRun, verify, anchors; update package docstring"
+    },
+    {
+      "path": "tests/test_certified_run.py",
+      "action": "added",
+      "purpose": "CertifiedRun lifecycle and bypass tests (scope/direction)"
+    },
+    {
+      "path": "tests/test_harness_verify.py",
+      "action": "added",
+      "purpose": "verify invariants, anchors, CLI, §6 honesty test"
+    }
+  ],
+  "self_test": [
+    {
+      "cmd": "python3 -m venv .venv && .venv/bin/python -m pip install -e \".[dev,demo]\"",
+      "exit_code": 0,
+      "output_tail": "Successfully installed alpha-court-0.1.0.dev0 ... matplotlib-3.11.0 numpy-2.5.1 pytest-9.1.1 ruff-0.15.21 scipy-1.18.0"
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest tests/test_certified_run.py tests/test_harness_verify.py -q --tb=line  # red: impl modules temporarily removed",
+      "exit_code": 1,
+      "output_tail": "FAILED tests/test_harness_verify.py::test_git_anchor_pin_verify_roundtrip - ModuleNotFoundError: No module named 'harness.anchor'\nFAILED tests/test_harness_verify.py::test_cli_exit_codes - ModuleNotFoundError: No module named 'harness.run'\n36 failed in 0.99s"
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest tests/test_certified_run.py tests/test_harness_verify.py -v",
+      "exit_code": 0,
+      "output_tail": "tests/test_harness_verify.py::test_cli_exit_codes PASSED [100%]\n============================== 36 passed in 3.19s =============================="
+    },
+    {
+      "cmd": ".venv/bin/python -m pytest",
+      "exit_code": 0,
+      "output_tail": "tests/test_tstats.py ............... [100%]\n================== 447 passed, 1 skipped in 724.76s (0:12:04) =================="
+    },
+    {
+      "cmd": ".venv/bin/ruff check .",
+      "exit_code": 0,
+      "output_tail": "All checks passed!"
+    }
+  ],
+  "deviations": [],
+  "open_questions": [],
+  "notes_for_referee": "36 new tests (AC-2 ≥25). AC-5: git diff --stat BASE..HEAD touches only the six owned files; examples/ empty. Red-phase evidence: tests authored first; recorded non-zero pytest was a ModuleNotFound red with impl modules temporarily removed (exit 1, 36 failed), then green restore. Seal policy payload is verbatim from ledger.declarations() (⚠-2). Verify walks raw JSONL for order (⚠-1)."
+}

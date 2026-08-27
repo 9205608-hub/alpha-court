@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# pre-commit: run the gate suite over the staged index. See .githooks/run-gates.sh.
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 1
+exec bash "$ROOT/.githooks/run-gates.sh" "$@"

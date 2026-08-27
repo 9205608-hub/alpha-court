@@ -1,0 +1,30 @@
+{
+  "ticket_id": "v0.1-05",
+  "status": "done",
+  "summary": "Addressed three referee precision fixes in docs/research/pbo-cscv.md only: (1) documented N/2 vs (N+1)/2 mismatch between Eq. (2.2) and the λ_c < 0 estimator, keeping λ_c < 0 as operational ground truth; (2) explicitly flagged Alg. 2.3 step (c) paper typo that mislabels training J as testing; (3) widened §1 equation citation range to Eq. (2.1)–(2.4).",
+  "branch": "dispatch/v01-05-pbo-20260710-171735",
+  "commit": "2e0a2f2be6f8fb164182dcb8ed7df8da4ee76b4c",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v01-05-pbo-20260710-171735",
+  "files_changed": [
+    {
+      "path": "docs/research/pbo-cscv.md",
+      "action": "modified",
+      "purpose": "Referee precision fixes: threshold mismatch, Alg. 2.3(c) typo flag, equation range"
+    }
+  ],
+  "self_test": [
+    {
+      "cmd": "git status --porcelain",
+      "exit_code": 0,
+      "output_tail": ""
+    },
+    {
+      "cmd": "git log --oneline -1",
+      "exit_code": 0,
+      "output_tail": "2e0a2f2 v0.1-05: address referee findings"
+    }
+  ],
+  "deviations": [],
+  "open_questions": [],
+  "notes_for_referee": "Operational rule remains count λ_c < 0 only. §3.5 now walks N=4, r̄=2 case where λ rule and literal Eq. (2.2) diverge. Alg. 2.3(c) train/test parenthetical slip flagged parallel to the binom(16,8) typo."
+}

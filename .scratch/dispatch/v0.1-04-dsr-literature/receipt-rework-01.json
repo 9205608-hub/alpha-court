@@ -1,0 +1,40 @@
+{
+  "ticket_id": "v0.1-04",
+  "status": "done",
+  "summary": "Updated docs/research/dsr.md for six minor referee items: stated Eq. (8) expanded Mertens form and its algebraic collapse to the §2.5/Eq. (11) denominator; marked 2014 Eq. (1)/(2) expected-max as ≈ under N ≫ 1 with App. A.2 Monte Carlo caveat; declared SR̂₀ (2014) renamed as SR̂* in this note; restated App. A.3 ill-conditioning as T < ½M(M−1); rephrased §3 runtime-source cells as math/prose; gave the PSR standard-error rewrite its own Eq. (11)/§2.5 citation.",
+  "branch": "dispatch/v01-04-dsr-20260710-171728",
+  "commit": "11e53cc82aaa8243cf974107ffb5bb094602415e",
+  "worktree_path": "[HOME]/.alpha-court/dispatch-worktrees/v01-04-dsr-20260710-171728",
+  "files_changed": [
+    {
+      "path": "docs/research/dsr.md",
+      "action": "modified",
+      "purpose": "Six minor precision fixes from referee findings (variance-form collapse, EVT ≈, SR̂₀ alias, T ill-conditioning, no-code mapping prose, SE-form citation)"
+    }
+  ],
+  "self_test": [
+    {
+      "cmd": "python3 content-checks for six referee items on docs/research/dsr.md",
+      "exit_code": 0,
+      "output_tail": "OK: 1 expanded Eq8\nOK: 1 collapse stated\nOK: 1 both citations collapse\nOK: 2 approx symbol\nOK: 2 App A.2 MC\nOK: 3 SR0 rename\nOK: 4 T condition\nOK: 4 paper condition text\nOK: 5 no norm.cdf in tables\nOK: 6 SE form citation"
+    },
+    {
+      "cmd": "git add docs/research/dsr.md && git commit -m \"v0.1-04: address referee findings\"",
+      "exit_code": 0,
+      "output_tail": "[dispatch/v01-04-dsr-20260710-171728 11e53cc] v0.1-04: address referee findings\n 1 file changed, 85 insertions(+), 49 deletions(-)"
+    },
+    {
+      "cmd": "git status --porcelain",
+      "exit_code": 0,
+      "output_tail": ""
+    },
+    {
+      "cmd": "git log --oneline -1",
+      "exit_code": 0,
+      "output_tail": "11e53cc v0.1-04: address referee findings"
+    }
+  ],
+  "deviations": [],
+  "open_questions": [],
+  "notes_for_referee": "All six listed minors addressed in docs/research/dsr.md only. Numeric test vectors unchanged. Look first at §2.a (Eq. 8 expanded + collapse), §2.c (≈ / N≫1 / SR̂₀ rename), §2.b SE rewrite citation, §3 tables (math/prose), §5.3 (T < ½M(M−1))."
+}
